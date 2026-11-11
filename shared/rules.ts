@@ -36,17 +36,39 @@ const TIME_RE = new RegExp(
   String.raw`\b(?:at\s+\d{1,2}(?::\d{2})?(?:\s*(?:am|pm|a\.m\.|p\.m\.))?|\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)|tonight|this (?:morning|afternoon|evening)|later (?:today|tonight|this (?:morning|afternoon|evening)|in the (?:morning|afternoon|evening))|tomorrow|on (?:${DAYS})|this (?:${DAYS})|next (?:${DAYS}))\b`,
   "i",
 );
+// Deadlines: "by Friday", "before tomorrow", "by EOD", "due Monday", "ASAP" (but not "due to the rain").
+const DEADLINE_RE = new RegExp(
+  String.raw`\b(?:(?:by|before) (?:${DAYS}|tomorrow|tonight|noon|eod|eow|end of (?:the )?(?:day|week|month))|due (?:${DAYS}|today|tomorrow|tonight|next|this|on|by)|asap)\b`,
+  "i",
+);
+// "I finished the report by Friday" met its deadline already.
+const DONE_BY_RE = /\b(?:i|we|they|he|she)\s+(?:\w+ed|sent|paid|bought|got|made|did|wrote|took|gave|left|met)\b/i;
 const INTENT_RE =
   /\b(?:i\s+(?:have|need|got|gotta|must|should|want|plan|am planning|'m planning|am going|'m going|will|'d like)\s+to|i'?ll|i\s+(?:was wondering|wonder|am wondering|'m wondering) if i (?:could|should|can|might)|maybe i (?:could|should|can|will|'ll)|i (?:have|'ve got|got) (?:an? )?(?:meeting|appointment|call|interview|class|session|flight|date|dinner|lunch|coffee)|(?:meeting|appointment|call|interview) with)\b/i;
 // Looking back rather than ahead: "Meetings were tiring", "I cooked dinner at 7".
 const PAST_RE = /\b(?:was|were|went|had|did|felt|got back|yesterday|ago|last (?:night|week))\b/i;
 
+// List markers that open a line: "- ", "* ", "• ", "1. ", "2) ", then an optional checkbox: "[ ]", "[x]", "☐", "✅".
+const MARKER_RE = /^\s*(?:(?:[-*•]|\d+[.)])\s*)?(?:(?:\[[\sxX]?\]|☐|☑️?|✅|✔️?)\s*)?/;
+const CHECKBOX_RE = /^\s*(?:(?:[-*•]|\d+[.)])\s*)?(?:\[[\sxX]?\]|☐|☑️?|✅|✔️?)/;
+// A label that marks the line as a task: "Reminder: dentist at 4", "pending: send the invoice".
+const TODO_LABEL_RE = /^(?:to-?do|reminders?|pending|tasks?|action items?)\s*:\s*/i;
+// A status tacked onto the end of a task, dropped from its title: "report (in progress)", "pay rent - done".
+const STATUS_SUFFIX_RE = /(?:\s[-–—]\s*|\s*[(\[])(?:done|completed|in progress|not started|overdue)[)\]]?[.!]*\s*$/i;
+
 /** Is this clause something the user means to do? */
 const isTask = (c: string) =>
-  TODO_RE.test(stripBullet(c)) || INTENT_RE.test(c) || (TIME_RE.test(c) && !PAST_RE.test(c.replace(INTENT_RE, "")));
+  CHECKBOX_RE.test(c) ||
+  TODO_LABEL_RE.test(stripMarker(c)) ||
+  TODO_RE.test(stripBullet(c)) ||
+  INTENT_RE.test(c) ||
+  (TIME_RE.test(c) && !PAST_RE.test(c.replace(INTENT_RE, ""))) ||
+  (DEADLINE_RE.test(c) && !PAST_RE.test(c) && !DONE_BY_RE.test(c));
 
-const TODO_HEADER_RE = /\b(to-?do|to do|tasks|to buy|shopping list|checklist)\b/i;
-const stripBullet = (l: string) => l.replace(/^\s*(?:[-*•]|\d+[.)])?\s*(?:\[\s?\]\s*)?(?:to-?do:\s*)?/i, "");
+const TODO_HEADER_RE =
+  /\b(to-?do|to do|tasks|to buy|shopping list|grocer(?:y|ies)(?: list)?|packing list|errands|reminders|action items|checklist)\b/i;
+const stripMarker = (l: string) => l.replace(MARKER_RE, "");
+const stripBullet = (l: string) => stripMarker(l).replace(TODO_LABEL_RE, "");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const stripPrefix = (l: string) => capitalize(l.replace(/^(?:idea|note|thought):\s*/i, ""));
 // Opening filler that isn't part of the task: "Hey, today I have a meeting…" → "Meeting…"
@@ -55,7 +77,7 @@ const INTENT_LEAD =
   /^(?:i\s+(?:have|need|got|gotta|must|should|want|plan|am planning|'m planning|am going|'m going|will|'d like)\s+to|i'?ll|i\s+(?:was wondering|wonder|am wondering|'m wondering) if i (?:could|should|can|might)|maybe i (?:could|should|can|will|'ll)|i (?:have|'ve got|got)(?: an?)?(?= (?:meeting|appointment|call|interview|class|session|flight|date|dinner|lunch|coffee)\b)|remember to|don'?t forget to|remind me to|need to)\s*/i;
 // "Hey, I was wondering if I could read Atomic Habits later tonight." → "Read Atomic Habits later tonight"
 const todoTitle = (l: string) =>
-  capitalize(stripBullet(l).replace(FILLER, "").replace(INTENT_LEAD, "").replace(/[.;,!]+$/, "").trim());
+  capitalize(stripBullet(l).replace(STATUS_SUFFIX_RE, "").replace(FILLER, "").replace(INTENT_LEAD, "").replace(/[.;,!]+$/, "").trim());
 const short = (s: string, n = 48) => (s.length > n ? s.slice(0, n) + "…" : s);
 
 // ---------- Splitting one message into one clause per intent ----------
@@ -76,7 +98,8 @@ const isFiller = (s: string) => /^(?:hey|hi|hello|ok|okay|so|um|well|alright|oh)
 function clauses(text: string): string[] {
   const out: string[] = [];
   for (const line of text.split("\n").map((l) => l.trim()).filter(Boolean)) {
-    for (const sentence of line.split(/(?<=[.!?;])\s+/)) {
+    // The "." of a list number ("2. Email Maya") doesn't end a sentence.
+    for (const sentence of line.split(/(?<!^\d+[.)])(?<=[.!?;])\s+/)) {
       const parts = sentence.split(/(,\s*|\s+and\s+|\s+also\s+|\s+then\s+)/i);
       let current = parts[0];
       for (let i = 1; i < parts.length; i += 2) {
@@ -116,7 +139,7 @@ function parse(text: string): Clause[] {
   const parsed = clauses(text).map((c): Clause => {
     const urls = extractUrls(c);
     if (urls.length) return { kind: "link", text: urls.reduce((acc, u) => acc.replace(u, ""), c).replace(/\s+/g, " ").trim(), urls };
-    if (/^\s*(?:idea:|what if)/i.test(c)) return { kind: "idea", text: c, urls: [] };
+    if (/^\s*(?:idea:|what if)/i.test(stripMarker(c))) return { kind: "idea", text: c, urls: [] };
     if (isTask(c)) return { kind: "todo", text: c, urls: [] };
     if (IDEA_RE.test(c)) return { kind: "idea", text: c, urls: [] };
     return { kind: byKeywords(c), text: c, urls: [] };
@@ -138,7 +161,7 @@ const base = { topic: null, attachment_id: null, link_id: null };
 
 function itemFor(c: Clause): NewItem {
   if (c.kind === "todo") return { ...base, category: "todo", title: short(todoTitle(c.text), 80), body: "" };
-  const text = stripPrefix(c.text);
+  const text = stripPrefix(stripMarker(c.text));
   return { ...base, category: c.kind === "idea" ? "idea" : "note", title: short(text), body: text };
 }
 
