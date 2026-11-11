@@ -118,13 +118,6 @@ export default function App() {
               </svg>
             </button>
           </div>
-          {api.demo ? (
-            <span className="ai-badge">Demo</span>
-          ) : ai !== null && (
-            <span className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Sorted automatically by Claude" : "Set ANTHROPIC_API_KEY to turn on AI sorting"}>
-              {ai ? "✦ Sorted by Claude" : "Rule-based sorting"}
-            </span>
-          )}
         </div>
         <div className="doc-scroll">
           {activeView === "journal" ? (
@@ -153,6 +146,16 @@ export default function App() {
             📄 Docs
           </button>
         </div>
+        {/* How messages get sorted, kept small in the bottom-right corner so it stays out of the way. */}
+        {api.demo ? (
+          <span className="ai-badge">Demo</span>
+        ) : (
+          ai !== null && (
+            <span className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Sorted automatically by Claude" : "Set ANTHROPIC_API_KEY to turn on AI sorting"}>
+              {ai ? "✦ Sorted by Claude" : "Rule-based sorting"}
+            </span>
+          )
+        )}
       </nav>
 
       {dialog && (
