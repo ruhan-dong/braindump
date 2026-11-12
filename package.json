@@ -12,6 +12,7 @@
     "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test shared/rules.test.ts",
+    "db:migrate": "tsx server/migrate.ts",
     "build:demo": "vite build --config vite.demo.config.ts",
     "seed:export": "tsx server/seed.ts export"
   },
@@ -20,6 +21,7 @@
     "exifr": "^7.1.3",
     "express": "^5.2.1",
     "multer": "^2.4.0",
+    "postgres": "^4.1.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tesseract.js": "^7.0.0",
