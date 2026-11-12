@@ -1,10 +1,10 @@
-// Builds a self-contained, read-only snapshot of the app as one HTML page that can be shared
-// (e.g. published as a claude.ai Artifact). Usage: npm run build:demo → dist-demo/braindump-demo.html
+// Builds a self-contained snapshot of the app, filled with the sample data in seed/, as one HTML page that can be
+// shared (e.g. published as a claude.ai Artifact). Usage: npm run build:demo → dist-demo/braindump-demo.html
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import { DATA_DIR, listMessages, listTemplates, getStoredName, storedPath } from "./server/db.ts";
+import { SEED_UPLOADS, seedMessages, seedTemplates } from "./server/seed.ts";
 
 const toDataUri = (buf: Buffer, mime: string) => `data:${mime};base64,${buf.toString("base64")}`;
 
@@ -19,11 +19,11 @@ async function fetchAsDataUri(url: string): Promise<string | null> {
   }
 }
 
-/** The current message log with every upload and link preview image inlined, so the page needs no server. */
+/** The sample log with every upload and link preview image inlined, so the page needs no server. */
 async function snapshot() {
-  const messages = listMessages();
+  const messages = seedMessages();
   for (const m of messages) {
-    for (const a of m.attachments) a.url = toDataUri(fs.readFileSync(storedPath(getStoredName(a.id))), a.mime);
+    for (const a of m.attachments) a.url = toDataUri(fs.readFileSync(path.join(SEED_UPLOADS, path.basename(a.url))), a.mime);
     for (const l of m.links) if (l.image) l.image = await fetchAsDataUri(l.image);
   }
   return messages;
@@ -58,10 +58,9 @@ function singlePage(): Plugin {
 }
 
 export default defineConfig(async () => {
-  if (!fs.existsSync(path.join(DATA_DIR, "braindump.db"))) throw new Error("No data yet: run the app and add some messages first.");
   return {
     plugins: [react(), singlePage()],
-    define: { __SNAPSHOT__: JSON.stringify(await snapshot()), __TEMPLATES__: JSON.stringify(listTemplates()) },
+    define: { __SNAPSHOT__: JSON.stringify(await snapshot()), __TEMPLATES__: JSON.stringify(seedTemplates()) },
     resolve: { alias: [{ find: /^(\.\.?\/)+api\.ts$/, replacement: path.resolve("src/demo/api.ts") }] },
     build: { outDir: "dist-demo", emptyOutDir: true, cssCodeSplit: false, assetsInlineLimit: Infinity },
   };

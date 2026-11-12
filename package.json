@@ -14,7 +14,7 @@
     "test": "tsx --test shared/rules.test.ts",
     "db:migrate": "tsx server/migrate.ts",
     "build:demo": "vite build --config vite.demo.config.ts",
-    "seed:export": "tsx server/seed.ts export"
+    "seed:import": "tsx server/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

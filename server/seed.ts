@@ -1,51 +1,118 @@
-// Sample data that ships with the repo, so a fresh clone opens with the same log, documents and templates.
-//   npm run seed:export   copy the current data/ into seed/ (commit the result)
-//   On startup, an empty database is filled from seed/ automatically.
+// Sample data that ships with the repo in seed/: a log, its images and voice memos, and a few custom templates.
+//   npm run seed:import <email>   copy it into that user's account, if the account is still empty
+// The demo build (vite.demo.config.ts) shows the same sample.
+import "./env.ts";
 import fs from "node:fs";
 import path from "node:path";
-import { db, UPLOAD_DIR } from "./db.ts";
+import type { Message } from "./db.ts";
+import type { Template } from "../shared/templates.ts";
 
 const SEED_DIR = path.resolve("seed");
 const SEED_FILE = path.join(SEED_DIR, "seed.json");
-const SEED_UPLOADS = path.join(SEED_DIR, "uploads");
-const TABLES = ["messages", "attachments", "links", "items", "templates"] as const;
+export const SEED_UPLOADS = path.join(SEED_DIR, "uploads");
 
-type Row = Record<string, string | number | null>;
+type Row = Record<string, any>;
+// Rows as they were exported from the original SQLite database, children in the order they were added.
+type Seed = { messages: Row[]; attachments: Row[]; links: Row[]; items: Row[]; templates: Row[] };
+const readSeed = (): Seed => JSON.parse(fs.readFileSync(SEED_FILE, "utf8"));
 
-export function exportSeed() {
-  const data = Object.fromEntries(TABLES.map((t) => [t, db.prepare(`SELECT * FROM ${t} ORDER BY rowid`).all() as Row[]]));
-  fs.rmSync(SEED_DIR, { recursive: true, force: true });
-  fs.mkdirSync(SEED_UPLOADS, { recursive: true });
-  for (const a of data.attachments) fs.copyFileSync(path.join(UPLOAD_DIR, String(a.stored_name)), path.join(SEED_UPLOADS, String(a.stored_name)));
-  fs.writeFileSync(SEED_FILE, JSON.stringify(data, null, 2) + "\n");
-  console.log(`Exported ${TABLES.map((t) => `${data[t].length} ${t}`).join(", ")} to seed/`);
+/** The sample log in the shape the API returns. Attachment files are in SEED_UPLOADS, named by the end of their url. */
+export function seedMessages(): Message[] {
+  const seed = readSeed();
+  return seed.messages.map((m) => ({
+    id: m.id,
+    created_at: m.created_at,
+    text: m.text,
+    status: m.status,
+    attachments: seed.attachments
+      .filter((a) => a.message_id === m.id)
+      .map((a) => ({ id: a.id, kind: a.kind, filename: a.filename, mime: a.mime, size: a.size, url: `/uploads/${a.stored_name}`, transcript: a.transcript })),
+    links: seed.links
+      .filter((l) => l.message_id === m.id)
+      .map((l) => ({ id: l.id, url: l.url, title: l.title, description: l.description, image: l.image, site_name: l.site_name })),
+    items: seed.items
+      .filter((i) => i.message_id === m.id)
+      .sort((a, b) => a.position - b.position)
+      .map((i) => ({ id: i.id, category: i.category, topic: i.topic, title: i.title, body: i.body, attachment_id: i.attachment_id, link_id: i.link_id, done: !!i.done })),
+  }));
 }
 
-/** Fills an empty database from seed/. Does nothing once there is any data, so it never touches someone's own notes. */
-export function importSeedIfEmpty() {
-  if (!fs.existsSync(SEED_FILE)) return;
-  const count = (t: string) => (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n;
-  if (count("messages") > 0 || count("templates") > 0) return;
+export function seedTemplates(): Template[] {
+  return readSeed().templates.map((t) => ({ id: t.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
+}
 
-  const data: Record<(typeof TABLES)[number], Row[]> = JSON.parse(fs.readFileSync(SEED_FILE, "utf8"));
-  db.exec("BEGIN");
+/** Copies the sample into one user's account. Does nothing if they already have data, so it never touches real notes. */
+async function importSeed(email: string) {
+  const { sql, newId, UPLOAD_DIR } = await import("./db.ts");
   try {
-    for (const t of TABLES) {
-      for (const row of data[t] ?? []) {
-        const cols = Object.keys(row);
-        db.prepare(`INSERT INTO ${t} (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).run(...cols.map((c) => row[c]));
-      }
-    }
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
+    const [user] = await sql`SELECT id FROM auth.users WHERE email = ${email}`;
+    if (!user) throw new Error(`No user with the email ${email}. Add them in the Supabase dashboard first.`);
+    const [{ n }] = await sql`
+      SELECT (SELECT COUNT(*) FROM messages WHERE user_id = ${user.id})::int + (SELECT COUNT(*) FROM templates WHERE user_id = ${user.id})::int AS n`;
+    if (n > 0) return console.log(`${email} already has data. Nothing imported.`);
+
+    const seed = readSeed();
+    // Every row gets a new id and every file a new name, so the same sample can go to more than one user.
+    const ids = new Map<string, string>();
+    const fresh = (old: string | null) => (old === null ? null : (ids.get(old) ?? ids.set(old, newId()).get(old)!));
+    const position = (rows: Row[], row: Row) => rows.filter((r) => r.message_id === row.message_id).indexOf(row);
+    const files = seed.attachments.map((a) => ({ from: a.stored_name, to: newId() + path.extname(a.stored_name) }));
+
+    const messages = seed.messages.map((m) => ({ id: fresh(m.id), user_id: user.id, conversation_id: m.conversation_id, created_at: m.created_at, text: m.text, status: m.status }));
+    const attachments = seed.attachments.map((a, i) => ({
+      id: fresh(a.id),
+      user_id: user.id,
+      message_id: fresh(a.message_id),
+      position: position(seed.attachments, a),
+      kind: a.kind,
+      filename: a.filename,
+      mime: a.mime,
+      size: a.size,
+      stored_name: files[i].to,
+      transcript: a.transcript,
+    }));
+    const links = seed.links.map((l) => ({
+      id: fresh(l.id),
+      user_id: user.id,
+      message_id: fresh(l.message_id),
+      position: position(seed.links, l),
+      url: l.url,
+      title: l.title,
+      description: l.description,
+      image: l.image,
+      site_name: l.site_name,
+    }));
+    const items = seed.items.map((i) => ({
+      id: fresh(i.id),
+      user_id: user.id,
+      message_id: fresh(i.message_id),
+      position: i.position,
+      category: i.category,
+      topic: i.topic,
+      title: i.title,
+      body: i.body,
+      attachment_id: fresh(i.attachment_id),
+      link_id: fresh(i.link_id),
+      done: !!i.done,
+    }));
+    const templates = seed.templates.map((t) => ({ id: fresh(t.id), user_id: user.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
+
+    await sql.begin(async (tx) => {
+      if (messages.length) await tx`INSERT INTO messages ${tx(messages)}`;
+      if (attachments.length) await tx`INSERT INTO attachments ${tx(attachments)}`;
+      if (links.length) await tx`INSERT INTO links ${tx(links)}`;
+      if (items.length) await tx`INSERT INTO items ${tx(items)}`;
+      if (templates.length) await tx`INSERT INTO templates ${tx(templates)}`;
+    });
+    for (const f of files) fs.copyFileSync(path.join(SEED_UPLOADS, f.from), path.join(UPLOAD_DIR, f.to));
+    console.log(`Imported ${messages.length} messages, ${attachments.length} files and ${templates.length} templates for ${email}.`);
+  } finally {
+    await sql.end();
   }
-  for (const a of data.attachments ?? []) {
-    const from = path.join(SEED_UPLOADS, String(a.stored_name));
-    if (fs.existsSync(from)) fs.copyFileSync(from, path.join(UPLOAD_DIR, String(a.stored_name)));
-  }
-  console.log(`Loaded sample data from seed/ (${data.messages.length} messages, ${data.templates?.length ?? 0} templates)`);
 }
 
-if (process.argv[1]?.endsWith("seed.ts") && process.argv[2] === "export") exportSeed();
+if (process.argv[1]?.endsWith("seed.ts")) {
+  const email = process.argv[2];
+  if (!email) throw new Error("Usage: npm run seed:import <email>");
+  await importSeed(email);
+}
