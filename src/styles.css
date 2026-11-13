@@ -77,7 +77,11 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 12px max(18px, calc((100% - 760px) / 2)); border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 8px; font-family: var(--serif); font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
 .brand-mark { font-size: 18px; }
+.chat-header-end { display: flex; align-items: center; gap: 12px; }
 .chat-count { color: var(--muted); font-size: 12.5px; }
+/* Sign out, at the top right of both panes. */
+.account { flex-shrink: 0; border: 0; border-radius: var(--radius); padding: 3px 10px; font-size: 12.5px; white-space: nowrap; background: var(--bg); color: var(--ink-2); box-shadow: 0 0 0 1px var(--line-strong); }
+.account:hover { background: var(--bg-hover); color: var(--ink); }
 .link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--link); text-align: left; }
 .link-btn:hover { text-decoration: underline; }
 .link-btn:disabled { color: var(--muted); text-decoration: none; cursor: default; }
@@ -371,6 +375,21 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .dialog-mode { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
 .dialog-error { margin: 8px 0 0; font-size: 13px; color: #d44c47; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* ---------- Sign in ---------- */
+.login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: start center; padding: 14vh 16px 24px; background: var(--bg-soft); }
+.login-card { width: 100%; max-width: 380px; background: var(--bg); border-radius: 10px; padding: 26px 24px 20px; box-shadow: 0 0 0 1px var(--line), 0 4px 16px rgba(15, 15, 15, 0.06); }
+.login-card .brand { margin-bottom: 18px; }
+.login-card h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; line-height: 1.2; margin: 0 0 4px; }
+.login-lede { margin: 0 0 18px; color: var(--ink-2); font-size: 14px; }
+.login-card label { display: block; font-size: 12.5px; color: var(--ink-2); margin: 12px 0 4px; }
+.login-card input { width: 100%; font: inherit; color: var(--ink); padding: 8px 11px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); outline: 0; }
+.login-card input:focus { border-color: rgba(35, 131, 226, 0.5); box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.14); }
+.login-card .btn.primary { width: 100%; margin-top: 18px; padding: 9px 14px; }
+.login-note { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); }
+.login-switch { margin: 16px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
+.login-switch button { border: 0; background: none; padding: 0; color: var(--link); }
+.login-switch button:hover { text-decoration: underline; }
 .access-options { display: flex; flex-direction: column; gap: 8px; }
 .access-option { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .access-option strong { font-size: 14.5px; }

@@ -1,9 +1,9 @@
-import fs from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { CATEGORIES, CATEGORY_IDS } from "../shared/categories.ts";
-import { existingTopics, getStoredName, storedPath, type Message } from "./db.ts";
+import { existingTopics, getStoredName, type Message } from "./db.ts";
+import { readFile } from "./storage.ts";
 import { classifyWithRules, type NewItem } from "../shared/rules.ts";
 import { client } from "./claude.ts";
 
@@ -48,26 +48,27 @@ function sourceIndex(source: string, prefix: string, max: number): number | null
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const TEXTY = /^(text\/|application\/(json|xml|x-yaml|javascript))/;
 
-async function classifyWithClaude(msg: Message): Promise<NewItem[]> {
+async function classifyWithClaude(userId: string, msg: Message): Promise<NewItem[]> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
 
-  msg.attachments.forEach((a, i) => {
+  for (const [i, a] of msg.attachments.entries()) {
     let label = `[attachment:${i}] ${a.kind} "${a.filename}" (${a.mime})`;
     if (a.transcript) label += `\n${a.kind === "audio" ? "Voice memo transcript" : "Text read from the image"}: ${a.transcript}`;
     content.push({ type: "text", text: label });
-    const file = storedPath(getStoredName(a.id));
+    // Fetched from storage only when the file is something Claude can look at.
+    const file = async () => readFile(userId, "uploads", await getStoredName(userId, a.id));
     if (IMAGE_TYPES.has(a.mime) && a.size < 5_000_000) {
-      content.push({ type: "image", source: { type: "base64", media_type: a.mime as "image/png", data: fs.readFileSync(file, "base64") } });
+      content.push({ type: "image", source: { type: "base64", media_type: a.mime as "image/png", data: (await file()).toString("base64") } });
     } else if (a.mime === "application/pdf" && a.size < 20_000_000) {
-      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fs.readFileSync(file, "base64") } });
+      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: (await file()).toString("base64") } });
     } else if (TEXTY.test(a.mime) && a.size < 200_000) {
-      content.push({ type: "text", text: `Contents of ${a.filename}:\n${fs.readFileSync(file, "utf8")}` });
+      content.push({ type: "text", text: `Contents of ${a.filename}:\n${(await file()).toString("utf8")}` });
     }
-  });
+  }
   msg.links.forEach((l, i) => {
     content.push({ type: "text", text: `[link:${i}] ${l.url}\nPage title: ${l.title ?? "?"}\nPage description: ${l.description ?? "?"}` });
   });
-  content.push({ type: "text", text: `Topics already in use, by category: ${JSON.stringify(existingTopics())}` });
+  content.push({ type: "text", text: `Topics already in use, by category: ${JSON.stringify(await existingTopics(userId))}` });
   content.push({ type: "text", text: `Message text:\n${msg.text || "(no text)"}` });
 
   const response = await client!.beta.messages.parse({
@@ -108,10 +109,10 @@ function ensureCoverage(msg: Message, items: NewItem[]): NewItem[] {
   return [...items, ...missing];
 }
 
-export async function classify(msg: Message): Promise<NewItem[]> {
+export async function classify(userId: string, msg: Message): Promise<NewItem[]> {
   if (!client) return classifyWithRules(msg);
   try {
-    return ensureCoverage(msg, await classifyWithClaude(msg));
+    return ensureCoverage(msg, await classifyWithClaude(userId, msg));
   } catch (err) {
     console.error("[classify] falling back to rules:", err instanceof Error ? err.message : err);
     return classifyWithRules(msg);

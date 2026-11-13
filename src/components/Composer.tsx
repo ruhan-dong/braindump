@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type Pending } from "../api.ts";
 import { formatSize } from "../format.ts";
+import { MAX_FILE_BYTES } from "../../shared/limits.ts";
 import type { Scan } from "./PhotoAccess.tsx";
 
 type Recording = { recorder: MediaRecorder; recognition: any; startedAt: number; transcript: string };
@@ -81,6 +82,9 @@ export function Composer({ dropped, onDroppedConsumed, onOpenPhotos, scan }: Pro
 
   async function send() {
     if (sending || rec || (!text.trim() && pending.length === 0)) return;
+    // Say which file is too big before uploading it, instead of failing with "Couldn't send" after.
+    const tooBig = pending.find((p) => p.file.size > MAX_FILE_BYTES);
+    if (tooBig) return setError(`${tooBig.file.name} is ${formatSize(tooBig.file.size)}. Files can be up to ${formatSize(MAX_FILE_BYTES)} each.`);
     dictation.current?.stop();
     setSending(true);
     setError(null);
