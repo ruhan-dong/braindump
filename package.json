@@ -7,7 +7,7 @@
     "node": ">=23.4"
   },
   "scripts": {
-    "dev": "tsx watch --ignore 'src/**' --ignore 'data/**' server/index.ts",
+    "dev": "tsx watch --ignore 'src/**' server/index.ts",
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
@@ -27,6 +27,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tesseract.js": "^7.0.0",
+    "tsx": "^4.23.15",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -36,7 +37,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"
   }
