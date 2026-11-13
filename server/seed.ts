@@ -43,7 +43,8 @@ export function seedTemplates(): Template[] {
 
 /** Copies the sample into one user's account. Does nothing if they already have data, so it never touches real notes. */
 async function importSeed(email: string) {
-  const { sql, newId, UPLOAD_DIR } = await import("./db.ts");
+  const { sql, newId } = await import("./db.ts");
+  const { putFile } = await import("./storage.ts");
   try {
     const [user] = await sql`SELECT id FROM auth.users WHERE email = ${email}`;
     if (!user) throw new Error(`No user with the email ${email}. Add them in the Supabase dashboard first.`);
@@ -56,7 +57,7 @@ async function importSeed(email: string) {
     const ids = new Map<string, string>();
     const fresh = (old: string | null) => (old === null ? null : (ids.get(old) ?? ids.set(old, newId()).get(old)!));
     const position = (rows: Row[], row: Row) => rows.filter((r) => r.message_id === row.message_id).indexOf(row);
-    const files = seed.attachments.map((a) => ({ from: a.stored_name, to: newId() + path.extname(a.stored_name) }));
+    const files = seed.attachments.map((a) => ({ from: a.stored_name, to: newId() + path.extname(a.stored_name), mime: a.mime as string }));
 
     const messages = seed.messages.map((m) => ({ id: fresh(m.id), user_id: user.id, conversation_id: m.conversation_id, created_at: m.created_at, text: m.text, status: m.status }));
     const attachments = seed.attachments.map((a, i) => ({
@@ -97,6 +98,8 @@ async function importSeed(email: string) {
     }));
     const templates = seed.templates.map((t) => ({ id: fresh(t.id), user_id: user.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
 
+    // Files first, so a message never points at a file that isn't there.
+    for (const f of files) await putFile(user.id, "uploads", f.to, fs.readFileSync(path.join(SEED_UPLOADS, f.from)), f.mime);
     await sql.begin(async (tx) => {
       if (messages.length) await tx`INSERT INTO messages ${tx(messages)}`;
       if (attachments.length) await tx`INSERT INTO attachments ${tx(attachments)}`;
@@ -104,7 +107,6 @@ async function importSeed(email: string) {
       if (items.length) await tx`INSERT INTO items ${tx(items)}`;
       if (templates.length) await tx`INSERT INTO templates ${tx(templates)}`;
     });
-    for (const f of files) fs.copyFileSync(path.join(SEED_UPLOADS, f.from), path.join(UPLOAD_DIR, f.to));
     console.log(`Imported ${messages.length} messages, ${attachments.length} files and ${templates.length} templates for ${email}.`);
   } finally {
     await sql.end();

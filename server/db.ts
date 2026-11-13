@@ -1,14 +1,6 @@
 import postgres from "postgres";
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
 import type { Template, TemplateSpec } from "../shared/templates.ts";
-
-export const DATA_DIR = path.resolve("data");
-export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-export const THUMB_DIR = path.join(DATA_DIR, "thumbs");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-fs.mkdirSync(THUMB_DIR, { recursive: true });
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set. Copy .env.example to .env and fill in the Supabase values.");
 
@@ -74,10 +66,6 @@ export type Message = {
 };
 
 type Row = Record<string, any>;
-
-export function storedPath(storedName: string) {
-  return path.join(UPLOAD_DIR, storedName);
-}
 
 /** Turns message rows into full messages. Fetches everything attached to them in one round of queries, not per message. */
 async function hydrate(userId: string, rows: Row[]): Promise<Message[]> {

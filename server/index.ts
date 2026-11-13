@@ -1,10 +1,12 @@
 import "./env.ts";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import express from "express";
 import multer from "multer";
 import * as db from "./db.ts";
 import { authConfig, requireUser, userOf } from "./auth.ts";
+import { fileLink, putFile, readFile, removeFiles, type Folder } from "./storage.ts";
 import { classify } from "./classify.ts";
 import { aiEnabled } from "./claude.ts";
 import { generateTemplate } from "./templates.ts";
@@ -12,6 +14,7 @@ import { fetchPreview } from "./links.ts";
 import { extractUrls } from "../shared/rules.ts";
 import { isRecallQuery, photoName, recallTerms, searchPhotos, todoFromPhoto, wantsNote, wantsTodo } from "../shared/recall.ts";
 import { CATEGORY_IDS } from "../shared/categories.ts";
+import { MAX_FILE_BYTES } from "../shared/limits.ts";
 
 const PORT = Number(process.env.PORT ?? 5173);
 const isProd = process.env.NODE_ENV === "production";
@@ -33,13 +36,14 @@ const pushMessage = async (userId: string, id: string) => {
 /** Copies a photo from the library into the log as a new message, with the text read from it. */
 async function photoMessage(userId: string, photo: db.Photo): Promise<db.Message> {
   const storedName = db.newId() + ".jpg";
-  fs.copyFileSync(path.join(db.THUMB_DIR, path.basename(photo.url)), db.storedPath(storedName));
+  const image = await readFile(userId, "thumbs", path.basename(photo.url));
+  await putFile(userId, "uploads", storedName, image, "image/jpeg");
   return db.insertMessage(userId, "", [
     {
       kind: "image",
       filename: path.basename(photo.path),
       mime: "image/jpeg",
-      size: fs.statSync(db.storedPath(storedName)).size,
+      size: image.length,
       storedName,
       transcript: photo.text.trim() || null,
     },
@@ -93,13 +97,23 @@ async function organize(userId: string, id: string) {
 }
 
 // ---------- API ----------
+// A file is received into a temporary folder on this machine, then moved to the user's storage.
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "braindump-"));
 const upload = multer({
   storage: multer.diskStorage({
-    destination: db.UPLOAD_DIR,
+    destination: TMP_DIR,
     filename: (_req, file, cb) => cb(null, db.newId() + path.extname(file.originalname).toLowerCase()),
   }),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  limits: { fileSize: MAX_FILE_BYTES },
 });
+const discard = (file: Express.Multer.File) => fs.rm(file.path, { force: true }, () => {});
+async function store(userId: string, folder: Folder, file: Express.Multer.File) {
+  try {
+    await putFile(userId, folder, file.filename, await fs.openAsBlob(file.path), file.mimetype);
+  } finally {
+    discard(file);
+  }
+}
 
 const kindOf = (mime: string) =>
   mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "file";
@@ -133,6 +147,7 @@ app.post("/api/messages", upload.array("files"), async (req, res) => {
   const text = String(req.body.text ?? "").replace(/\r\n/g, "\n").trim();
   if (!text && files.length === 0) return res.status(400).json({ error: "Empty message" });
 
+  await Promise.all(files.map((f) => store(userId, "uploads", f)));
   const message = await db.insertMessage(
     userId,
     text,
@@ -162,7 +177,7 @@ app.post("/api/messages/:id/reorganize", async (req, res) => {
 
 app.delete("/api/messages/:id", async (req, res) => {
   const userId = userOf(res);
-  for (const f of await db.deleteMessage(userId, req.params.id)) fs.rm(db.storedPath(f), { force: true }, () => {});
+  await removeFiles(userId, "uploads", await db.deleteMessage(userId, req.params.id));
   broadcast(userId, { type: "deleted", id: req.params.id });
   res.sendStatus(204);
 });
@@ -199,26 +214,28 @@ app.delete("/api/templates/:id", async (req, res) => {
 });
 
 // ---------- Photo library ----------
-// The browser reads each photo (text, date, place) and sends only that plus a thumbnail; originals stay on disk.
+// The browser reads each photo (text, date, place) and sends only that plus a thumbnail; originals stay on the
+// person's own computer.
 const thumbUpload = multer({
-  storage: multer.diskStorage({ destination: db.THUMB_DIR, filename: (_req, _file, cb) => cb(null, db.newId() + ".jpg") }),
+  storage: multer.diskStorage({ destination: TMP_DIR, filename: (_req, _file, cb) => cb(null, db.newId() + ".jpg") }),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
-const removeThumb = (name: string) => fs.rm(path.join(db.THUMB_DIR, name), { force: true }, () => {});
 
 app.get("/api/photos", async (_req, res) => res.json({ folders: await db.photoFolders(userOf(res)) }));
 
 app.get("/api/photos/known", async (req, res) => res.json(await db.knownPhotoKeys(userOf(res), String(req.query.folder ?? ""))));
 
 app.post("/api/photos", thumbUpload.single("thumb"), async (req, res) => {
+  const userId = userOf(res);
   if (!req.file) return res.status(400).json({ error: "Missing thumbnail" });
   const meta = JSON.parse(req.body.meta ?? "{}");
   if (!meta.folder || !meta.path) {
-    removeThumb(req.file.filename);
+    discard(req.file);
     return res.status(400).json({ error: "Missing folder or path" });
   }
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  const replaced = await db.upsertPhoto(userOf(res), {
+  await store(userId, "thumbs", req.file);
+  const replaced = await db.upsertPhoto(userId, {
     folder: String(meta.folder),
     path: String(meta.path),
     size: Number(meta.size) || 0,
@@ -229,12 +246,13 @@ app.post("/api/photos", thumbUpload.single("thumb"), async (req, res) => {
     text: String(meta.text ?? "").slice(0, 20_000),
     thumb_name: req.file.filename,
   });
-  if (replaced) removeThumb(replaced);
+  if (replaced) await removeFiles(userId, "thumbs", [replaced]);
   res.sendStatus(201);
 });
 
 app.delete("/api/photos", async (req, res) => {
-  for (const t of await db.deletePhotoFolder(userOf(res), String(req.query.folder ?? ""))) removeThumb(t);
+  const userId = userOf(res);
+  await removeFiles(userId, "thumbs", await db.deletePhotoFolder(userId, String(req.query.folder ?? "")));
   res.sendStatus(204);
 });
 
@@ -249,8 +267,25 @@ app.post("/api/photos/:id/save", async (req, res) => {
   organize(userId, message.id);
 });
 
-app.use("/thumbs", express.static(db.THUMB_DIR, { maxAge: "7d" }));
-app.use("/uploads", express.static(db.UPLOAD_DIR, { maxAge: "7d" }));
+// Files are private. The address stays /uploads/<name>, but it only works for the signed-in owner: it sends them on
+// to a link for that one file that expires in an hour. Anyone else's file, even with its exact name, is a 404.
+const serve =
+  (folder: Folder): express.RequestHandler<{ name: string }> =>
+  async (req, res) => {
+    const link = await fileLink(userOf(res), folder, req.params.name);
+    if (!link) return void res.sendStatus(404);
+    res.set("Cache-Control", "private, max-age=600").redirect(302, link);
+  };
+app.get("/uploads/:name", serve("uploads"));
+app.get("/thumbs/:name", serve("thumbs"));
+
+// A file over the size limit: say so plainly instead of answering with a stack trace.
+app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+    return void res.status(413).json({ error: `Files can be up to ${MAX_FILE_BYTES / 1024 / 1024} MB each.` });
+  }
+  next(err);
+});
 
 // ---------- Frontend ----------
 if (isProd) {

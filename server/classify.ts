@@ -1,9 +1,9 @@
-import fs from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod/v4";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { CATEGORIES, CATEGORY_IDS } from "../shared/categories.ts";
-import { existingTopics, getStoredName, storedPath, type Message } from "./db.ts";
+import { existingTopics, getStoredName, type Message } from "./db.ts";
+import { readFile } from "./storage.ts";
 import { classifyWithRules, type NewItem } from "../shared/rules.ts";
 import { client } from "./claude.ts";
 
@@ -55,13 +55,14 @@ async function classifyWithClaude(userId: string, msg: Message): Promise<NewItem
     let label = `[attachment:${i}] ${a.kind} "${a.filename}" (${a.mime})`;
     if (a.transcript) label += `\n${a.kind === "audio" ? "Voice memo transcript" : "Text read from the image"}: ${a.transcript}`;
     content.push({ type: "text", text: label });
-    const file = storedPath(await getStoredName(userId, a.id));
+    // Fetched from storage only when the file is something Claude can look at.
+    const file = async () => readFile(userId, "uploads", await getStoredName(userId, a.id));
     if (IMAGE_TYPES.has(a.mime) && a.size < 5_000_000) {
-      content.push({ type: "image", source: { type: "base64", media_type: a.mime as "image/png", data: fs.readFileSync(file, "base64") } });
+      content.push({ type: "image", source: { type: "base64", media_type: a.mime as "image/png", data: (await file()).toString("base64") } });
     } else if (a.mime === "application/pdf" && a.size < 20_000_000) {
-      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: fs.readFileSync(file, "base64") } });
+      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: (await file()).toString("base64") } });
     } else if (TEXTY.test(a.mime) && a.size < 200_000) {
-      content.push({ type: "text", text: `Contents of ${a.filename}:\n${fs.readFileSync(file, "utf8")}` });
+      content.push({ type: "text", text: `Contents of ${a.filename}:\n${(await file()).toString("utf8")}` });
     }
   }
   msg.links.forEach((l, i) => {
