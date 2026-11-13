@@ -1,13 +1,35 @@
 import type { RequestHandler, Response } from "express";
-import { sql } from "./db.ts";
+import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 
-// TEMPORARY, until login is built: every request is treated as the first user in the Supabase project.
-const [devUser] = await sql<{ id: string }[]>`SELECT id FROM auth.users ORDER BY created_at LIMIT 1`;
-if (!devUser) throw new Error("No users yet. Add one in the Supabase dashboard: Authentication > Users > Add user.");
+const url = process.env.SUPABASE_URL;
+const key = process.env.SUPABASE_PUBLISHABLE_KEY;
+if (!url || !key) throw new Error("SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are not set. Copy .env.example to .env and fill in the Supabase values.");
 
-/** Works out who is asking and remembers it for the rest of the request. */
-export const requireUser: RequestHandler = (_req, res, next) => {
-  res.locals.userId = devUser.id;
+/** What the page needs to reach Supabase's sign-in service. Both values are meant to be public. */
+export const authConfig = { supabaseUrl: url, supabaseKey: key };
+
+/**
+ * Lets a request through only if it comes from a signed-in user, and remembers who that is.
+ * The page signs in with Supabase directly; the session then travels to us in cookies on every request.
+ */
+export const requireUser: RequestHandler = async (req, res, next) => {
+  const supabase = createServerClient(url, key, {
+    cookieOptions: { secure: process.env.NODE_ENV === "production" },
+    cookies: {
+      getAll: () => parseCookieHeader(req.headers.cookie ?? "").map(({ name, value }) => ({ name, value: value ?? "" })),
+      // A session that is about to expire is renewed here, and the new cookies go back with the response.
+      setAll: (cookies, headers) => {
+        if (res.headersSent) return;
+        for (const { name, value, options } of cookies) res.appendHeader("Set-Cookie", serializeCookieHeader(name, value, options));
+        for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+      },
+    },
+  });
+  // Checks the token's signature against Supabase's keys. What the cookie claims is never trusted as it is.
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims.sub;
+  if (!userId) return res.status(401).json({ error: "Not signed in" });
+  res.locals.userId = userId;
   next();
 };
 

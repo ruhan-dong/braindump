@@ -35,7 +35,7 @@ function flash(id: string, onMissing?: () => void) {
   });
 }
 
-export default function App() {
+export default function App({ email }: { email: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [ai, setAi] = useState<boolean | null>(null);
@@ -96,6 +96,13 @@ export default function App() {
     setView("journal");
   }
 
+  // Shown at the top right of whichever pane is open.
+  const account = api.demo ? null : (
+    <button className="account" onClick={() => api.auth.signOut()} title={`Signed in as ${email}`}>
+      Sign out
+    </button>
+  );
+
   const tab = (id: View, label: string) => (
     <button key={id} role="tab" aria-selected={activeView === id} className={activeView === id ? "on" : ""} onClick={() => setView(id)}>
       {label}
@@ -104,7 +111,7 @@ export default function App() {
 
   return (
     <div className={`app pane-${pane}`}>
-      <Chat messages={messages} onJumpToItem={jumpToItem} />
+      <Chat messages={messages} onJumpToItem={jumpToItem} account={account} />
 
       <main className="doc">
         <div className="doc-bar">
@@ -118,6 +125,7 @@ export default function App() {
               </svg>
             </button>
           </div>
+          {account}
         </div>
         <div className="doc-scroll">
           {activeView === "journal" ? (

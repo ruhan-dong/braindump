@@ -23,6 +23,17 @@ const kindOf = (mime: string): Attachment["kind"] =>
 
 export const api = {
   demo: true,
+  // The demo has no accounts: everyone is "signed in" as the same visitor.
+  auth: {
+    onChange: (callback: (email: string | null) => void) => {
+      callback("demo");
+      return () => {};
+    },
+    signIn: notInDemo,
+    signUp: notInDemo,
+    signOut: notInDemo,
+    forget: notInDemo,
+  },
   subscribe: (onEvent: (e: ServerEvent) => void, onOpen: () => void) => {
     listeners.add(onEvent);
     onOpen();

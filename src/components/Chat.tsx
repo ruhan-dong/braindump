@@ -10,9 +10,11 @@ import { COVERS } from "../covers.ts";
 type Props = {
   messages: Message[];
   onJumpToItem: (itemId: string) => void;
+  /** The sign-out control, shown at the right of the header. */
+  account?: ReactNode;
 };
 
-export function Chat({ messages, onJumpToItem }: Props) {
+export function Chat({ messages, onJumpToItem, account }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [dragging, setDragging] = useState(false);
@@ -57,7 +59,10 @@ export function Chat({ messages, onJumpToItem }: Props) {
           <span className="brand-mark">🧠</span>
           <span>BrainDump</span>
         </div>
-        <span className="chat-count">{messages.length} {messages.length === 1 ? "message" : "messages"}</span>
+        <div className="chat-header-end">
+          <span className="chat-count">{messages.length} {messages.length === 1 ? "message" : "messages"}</span>
+          {account}
+        </div>
       </header>
 
       <div

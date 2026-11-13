@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import multer from "multer";
 import * as db from "./db.ts";
-import { requireUser, userOf } from "./auth.ts";
+import { authConfig, requireUser, userOf } from "./auth.ts";
 import { classify } from "./classify.ts";
 import { aiEnabled } from "./claude.ts";
 import { generateTemplate } from "./templates.ts";
@@ -104,7 +104,8 @@ const upload = multer({
 const kindOf = (mime: string) =>
   mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "file";
 
-app.get("/api/status", (_req, res) => res.json({ ai: aiEnabled }));
+// Public: the page needs this before anyone has signed in.
+app.get("/api/status", (_req, res) => res.json({ ai: aiEnabled, ...authConfig }));
 
 // Everything below belongs to one user: their notes, templates, photo library and files.
 app.use(["/api", "/uploads", "/thumbs"], requireUser);
