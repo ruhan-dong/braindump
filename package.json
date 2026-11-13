@@ -11,7 +11,7 @@
     "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test shared/rules.test.ts",
+    "test": "tsx --test shared/rules.test.ts server/links.test.ts",
     "db:migrate": "tsx server/migrate.ts",
     "build:demo": "vite build --config vite.demo.config.ts",
     "seed:import": "tsx server/seed.ts"
