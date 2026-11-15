@@ -12,7 +12,7 @@ Each person signs up with an email and password and sees only their own log, tem
 
 ## Run
 
-BrainDump keeps accounts, data and uploaded files in a [Supabase](https://supabase.com) project, so you need one before the app will start.
+BrainDump keeps accounts, data and uploaded files in a Supabase project, so you need one before the app will start.
 
 1. Create a project at supabase.com.
 2. In its dashboard, under Authentication > URL Configuration, set **Site URL** to `http://localhost:5173`, so the link in the confirmation email comes back to the app.
@@ -36,6 +36,22 @@ To run a production build: `npm run build && npm start`.
 `npm run build:demo` builds a shareable page from the sample data in `seed/` as one HTML file, `dist-demo/braindump-demo.html`, with every image inlined. It needs no server and no Supabase project. Viewers can send messages (sorted by the rule-based categorizer in their browser), switch templates, tick to-dos, and change categories. Nothing is saved, so changes reset on reload.
 
 Before opening sign-up to other people: Supabase's built-in email service is meant for testing and only sends a few emails an hour, so set up your own email provider in the dashboard, or turn off email confirmation.
+
+## Deploy on Railway
+
+BrainDump runs on any host with Node 23.4 or newer: build with `npm run build`, start with `npm start`. The build needs the dev dependencies (Vite is one of them); the running server does not. The steps below are for Railway.
+
+1. In Railway, create a project from the GitHub repo. It finds the build and start commands in `package.json`.
+2. Under the service's Variables, set `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` to the same values as in `.env`. Leave `PORT` out, because Railway provides it. `ANTHROPIC_API_KEY` is optional, as it is locally.
+3. Under Settings > Deploy, set Custom Start Command to `npm run start`. Railway serves a project with a Vite config as a static site unless it has a start command. The `start` script already counts as one, and setting it here means that no longer depends on detection.
+4. Under Settings > Scale, pick the region closest to your Supabase project. Under Settings > Networking, generate a domain.
+5. In the Supabase dashboard, under Authentication > URL Configuration, set **Site URL** to the Railway address and add `http://localhost:5173` to **Redirect URLs**. Confirmation emails then link back to the right place from both the deployed app and local development.
+
+Every push to `main` deploys again. A deploy does not run database migrations, developers need to run `npm run db:migrate` manually:
+
+A deploy only builds and restarts the server, and the database lives in Supabase, so it stays as it was. Run the migration whenever a change adds a file to `supabase/migrations/`. For a change that only adds tables or columns, run it before merging: new code that goes live ahead of its migration fails until the migration has run. If your local `.env` has the same `DATABASE_URL` as the deployed app, running it locally updates the production database.
+
+To have Railway run it instead, add `npm run db:migrate` as a pre-deploy step under Settings > Deploy. It then runs after each build and before the new version starts, and a failed migration stops the deploy.
 
 ## How it works
 
