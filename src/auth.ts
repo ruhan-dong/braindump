@@ -10,13 +10,30 @@ const supabase = () =>
     .then((r) => r.json())
     .then((s) => createBrowserClient(s.supabaseUrl, s.supabaseKey, { cookieOptions: { secure: location.protocol === "https:" } })));
 
+// The link in the confirmation email comes back to us with ?code=… in the address. Supabase signs the person in with
+// it and removes it, but only in the browser they signed up in. Anywhere else the code is left over: the email is
+// confirmed, and they still have to sign in.
+let justConfirmed = false;
+function dropLeftoverCode(): boolean {
+  const url = new URL(location.href);
+  if (!url.searchParams.has("code")) return false;
+  url.searchParams.delete("code");
+  history.replaceState(history.state, "", url);
+  return true;
+}
+
 export const auth = {
   /** Calls back with the signed-in user's email (null when signed out): once right away, then on every change. */
   onChange(callback: (email: string | null) => void): () => void {
     let stop = () => {};
     let stopped = false;
     supabase().then((s) => {
-      const { data } = s.auth.onAuthStateChange((_event, session) => callback(session?.user.email ?? null));
+      const { data } = s.auth.onAuthStateChange((_event, session) => {
+        // Supabase has finished with the address by the time it first calls this.
+        const leftover = dropLeftoverCode();
+        justConfirmed = !session && (leftover || justConfirmed);
+        callback(session?.user.email ?? null);
+      });
       stop = () => data.subscription.unsubscribe();
       if (stopped) stop();
     });
@@ -25,6 +42,9 @@ export const auth = {
       stop();
     };
   },
+
+  /** True when the page was opened from the confirmation email and the person still has to sign in. */
+  justConfirmed: () => justConfirmed,
 
   /** Returns what went wrong, or null when signed in. */
   async signIn(email: string, password: string): Promise<string | null> {

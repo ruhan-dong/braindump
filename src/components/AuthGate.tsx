@@ -75,6 +75,7 @@ function Login() {
 
         {error && <p className="dialog-error" role="alert">{error}</p>}
         {confirm && <p className="login-note" role="status">Almost there. Open the link we emailed to {email.trim()}, then sign in.</p>}
+        {mode === "in" && !error && api.auth.justConfirmed() && <p className="login-note" role="status">Email confirmed. Sign in to continue.</p>}
 
         <button type="submit" className="btn primary" disabled={busy}>
           {busy ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}
