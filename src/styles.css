@@ -133,6 +133,10 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .msg-menu-pop button { border: 0; background: none; text-align: left; padding: 5px 10px; border-radius: 4px; font-size: 13.5px; }
 .msg-menu-pop button:hover { background: var(--bg-hover); }
 .msg-menu-pop .danger { color: #d44c47; }
+.msg-menu-pop button.on { background: var(--bg-soft); font-weight: 600; }
+.msg-menu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.tag-menu { position: relative; display: inline-flex; }
+.tag-menu .msg-menu-pop { min-width: 150px; white-space: nowrap; }
 
 .flash { animation: flash 1.6s ease-out; }
 @keyframes flash { 0%, 35% { background-color: rgba(35, 131, 226, 0.12); box-shadow: 0 0 0 4px rgba(35, 131, 226, 0.12); } 100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; } }
