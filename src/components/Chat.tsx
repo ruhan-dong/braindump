@@ -238,13 +238,47 @@ function Status({ m, onJumpToItem }: { m: Message; onJumpToItem: (itemId: string
       {CATEGORIES.map((c) => {
         const items = m.items.filter((i) => i.category === c.id);
         if (!items.length) return null;
-        return (
-          <button key={c.id} className={`tag cat-${c.id}`} onClick={() => onJumpToItem(items[0].id)} title="Show in Docs">
-            {c.emoji} {c.label}
-            {items.length > 1 ? ` ×${items.length}` : ""}
-          </button>
-        );
+        return <CategoryChip key={c.id} category={c} items={items} onJumpToItem={onJumpToItem} />;
       })}
+    </span>
+  );
+}
+
+type ChipProps = { category: (typeof CATEGORIES)[number]; items: Item[]; onJumpToItem: (itemId: string) => void };
+
+/** A category tag that opens a menu: move its items to another category, or show them in Docs. */
+function CategoryChip({ category, items, onJumpToItem }: ChipProps) {
+  const [open, setOpen] = useState(false);
+
+  function move(to: string) {
+    setOpen(false);
+    if (to !== category.id) for (const i of items) api.patchItem(i.id, { category: to });
+  }
+
+  return (
+    <span className="tag-menu">
+      <button className={`tag cat-${category.id}`} onClick={() => setOpen((o) => !o)} title="Change category" aria-expanded={open}>
+        {category.emoji} {category.label}
+        {items.length > 1 ? ` ×${items.length}` : ""}
+      </button>
+      {open && (
+        <span className="msg-menu-pop" onMouseLeave={() => setOpen(false)}>
+          {CATEGORIES.map((c) => (
+            <button key={c.id} className={c.id === category.id ? "on" : ""} onClick={() => move(c.id)}>
+              {c.emoji} {c.label}
+            </button>
+          ))}
+          <hr />
+          <button
+            onClick={() => {
+              setOpen(false);
+              onJumpToItem(items[0].id);
+            }}
+          >
+            Show in Docs
+          </button>
+        </span>
+      )}
     </span>
   );
 }

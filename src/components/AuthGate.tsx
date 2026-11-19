@@ -1,21 +1,30 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../api.ts";
 import App from "../App.tsx";
+import { Landing } from "./Landing.tsx";
 
-/** Shows the app to a signed-in user, and the sign-in page to everyone else. */
+type Screen = "landing" | "in" | "up";
+
+/** Shows the app to a signed-in user, and the landing page or sign-in page to everyone else. */
 export function AuthGate() {
   // undefined: still finding out. null: signed out.
   const [email, setEmail] = useState<string | null | undefined>(undefined);
+  // null until the visitor picks: the landing page, unless they came from the confirmation email.
+  const [screen, setScreen] = useState<Screen | null>(null);
   useEffect(() => api.auth.onChange(setEmail), []);
 
   if (email === undefined) return null;
-  if (email === null) return <Login />;
+  if (email === null) {
+    const shown = screen ?? (api.auth.justConfirmed() ? "in" : "landing");
+    if (shown === "landing") return <Landing onSignIn={() => setScreen("in")} onSignUp={() => setScreen("up")} />;
+    return <Login key={shown} initialMode={shown} onBack={() => setScreen("landing")} />;
+  }
   // The key makes the app start over when a different person signs in, so nothing of the last user's stays on screen.
   return <App key={email} email={email} />;
 }
 
-function Login() {
-  const [mode, setMode] = useState<"in" | "up">("in");
+function Login({ initialMode, onBack }: { initialMode: "in" | "up"; onBack: () => void }) {
+  const [mode, setMode] = useState<"in" | "up">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,10 +61,10 @@ function Login() {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit}>
-        <div className="brand">
+        <button type="button" className="brand brand-link" onClick={onBack} title="Back to the home page">
           <span className="brand-mark">🧠</span>
           <span>BrainDump</span>
-        </div>
+        </button>
         <h1>{mode === "in" ? "Sign in" : "Create your account"}</h1>
         <p className="login-lede">{mode === "in" ? "Your notes are private to your account." : "Dump anything. It gets sorted for you."}</p>
 
