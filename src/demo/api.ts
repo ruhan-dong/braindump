@@ -29,6 +29,7 @@ export const api = {
       callback("demo");
       return () => {};
     },
+    justConfirmed: () => false,
     signIn: notInDemo,
     signUp: notInDemo,
     signOut: notInDemo,
