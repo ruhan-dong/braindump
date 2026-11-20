@@ -1,5 +1,5 @@
 // Sample data that ships with the repo in seed/: a log, its images and voice memos, and a few custom templates.
-//   npm run seed:import <email>   copy it into that user's account, if the account is still empty
+//   npm run seed:import <email>   copy it into that user's account, if the account has no notes yet
 // The demo build (vite.demo.config.ts) shows the same sample.
 import "./env.ts";
 import fs from "node:fs";
@@ -41,16 +41,16 @@ export function seedTemplates(): Template[] {
   return readSeed().templates.map((t) => ({ id: t.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
 }
 
-/** Copies the sample into one user's account. Does nothing if they already have data, so it never touches real notes. */
+/** Copies the sample into one user's account. Does nothing if they already have notes, so it never touches real ones. */
 async function importSeed(email: string) {
   const { sql, newId } = await import("./db.ts");
   const { putFile } = await import("./storage.ts");
   try {
     const [user] = await sql`SELECT id FROM auth.users WHERE email = ${email}`;
     if (!user) throw new Error(`No user with the email ${email}. Add them in the Supabase dashboard first.`);
-    const [{ n }] = await sql`
-      SELECT (SELECT COUNT(*) FROM messages WHERE user_id = ${user.id})::int + (SELECT COUNT(*) FROM templates WHERE user_id = ${user.id})::int AS n`;
-    if (n > 0) return console.log(`${email} already has data. Nothing imported.`);
+    const [{ notes, own }] = await sql`
+      SELECT (SELECT COUNT(*) FROM messages WHERE user_id = ${user.id})::int AS notes, (SELECT COUNT(*) FROM templates WHERE user_id = ${user.id})::int AS own`;
+    if (notes > 0) return console.log(`${email} already has notes. Nothing imported.`);
 
     const seed = readSeed();
     // Every row gets a new id and every file a new name, so the same sample can go to more than one user.
@@ -96,7 +96,8 @@ async function importSeed(email: string) {
       link_id: fresh(i.link_id),
       done: !!i.done,
     }));
-    const templates = seed.templates.map((t) => ({ id: fresh(t.id), user_id: user.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
+    // A new account already starts with the sample's templates (supabase/migrations/0003_starter_templates.sql).
+    const templates = own > 0 ? [] : seed.templates.map((t) => ({ id: fresh(t.id), user_id: user.id, created_at: t.created_at, prompt: t.prompt, spec: JSON.parse(t.spec) }));
 
     // Files first, so a message never points at a file that isn't there.
     for (const f of files) await putFile(user.id, "uploads", f.to, fs.readFileSync(path.join(SEED_UPLOADS, f.from)), f.mime);
