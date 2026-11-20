@@ -136,8 +136,8 @@ function Bubble({ m, onJumpToItem, onOpenPhotos }: BubbleProps) {
         <RecallCard recall={m.recall} todo={m.items.find((i) => i.category === "todo")} onOpenPhotos={onOpenPhotos} onJumpToItem={onJumpToItem} />
       )}
       <div className="msg-meta">
-        {/* Delete/re-organize need the server (and confirm() doesn't work inside a shared Artifact). */}
-        {!api.demo && <MessageMenu m={m} />}
+        {/* A tagged message has these actions in its tag menus; the rest (sorting, failed, photo searches) get ···. */}
+        {!api.demo && !(m.status === "done" && m.items.length) && <MessageMenu m={m} />}
         <Status m={m} onJumpToItem={onJumpToItem} />
         <time dateTime={new Date(m.created_at).toISOString()}>{formatTime(m.created_at)}</time>
       </div>
@@ -238,17 +238,69 @@ function Status({ m, onJumpToItem }: { m: Message; onJumpToItem: (itemId: string
       {CATEGORIES.map((c) => {
         const items = m.items.filter((i) => i.category === c.id);
         if (!items.length) return null;
-        return <CategoryChip key={c.id} category={c} items={items} onJumpToItem={onJumpToItem} />;
+        return <CategoryChip key={c.id} m={m} category={c} items={items} onJumpToItem={onJumpToItem} />;
       })}
     </span>
   );
 }
 
-type ChipProps = { category: (typeof CATEGORIES)[number]; items: Item[]; onJumpToItem: (itemId: string) => void };
+/** Menus open downward, so one under the last message can run past the log; scroll it into view. */
+const revealMenu = (el: HTMLElement | null) => el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
 
-/** A category tag that opens a menu: move its items to another category, or show them in Docs. */
-function CategoryChip({ category, items, onJumpToItem }: ChipProps) {
+/** A menu that stays open until a choice is made, a click lands outside it, or Escape is pressed. */
+function useMenu() {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return { open, setOpen, ref };
+}
+
+// Actions on the whole message. They need the server (and confirm() doesn't work inside a shared Artifact),
+// so callers leave them out of the demo.
+type ActionProps = { m: Message; close: () => void };
+
+function SortAgainButton({ m, close }: ActionProps) {
+  return (
+    <button
+      onClick={() => {
+        close();
+        api.reorganize(m.id);
+      }}
+    >
+      Try auto sort again
+    </button>
+  );
+}
+
+function DeleteMessageButton({ m, close }: ActionProps) {
+  return (
+    <button
+      className="danger"
+      onClick={() => {
+        close();
+        if (confirm("Delete this whole message?")) api.remove(m.id);
+      }}
+    >
+      Delete message
+    </button>
+  );
+}
+
+type ChipProps = { m: Message; category: (typeof CATEGORIES)[number]; items: Item[]; onJumpToItem: (itemId: string) => void };
+
+/** A category tag that opens a menu: move its items to another category, show them in Docs, or act on the message. */
+function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
+  const { open, setOpen, ref } = useMenu();
 
   function move(to: string) {
     setOpen(false);
@@ -256,18 +308,22 @@ function CategoryChip({ category, items, onJumpToItem }: ChipProps) {
   }
 
   return (
-    <span className="tag-menu">
+    <span className="tag-menu" ref={ref}>
       <button className={`tag cat-${category.id}`} onClick={() => setOpen((o) => !o)} title="Change category" aria-expanded={open}>
         {category.emoji} {category.label}
         {items.length > 1 ? ` ×${items.length}` : ""}
+        <svg className="tag-caret" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <path d="M1.5 3 4 5.5 6.5 3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
       {open && (
-        <span className="msg-menu-pop" onMouseLeave={() => setOpen(false)}>
+        <span className="msg-menu-pop" ref={revealMenu}>
           {CATEGORIES.map((c) => (
             <button key={c.id} className={c.id === category.id ? "on" : ""} onClick={() => move(c.id)}>
               {c.emoji} {c.label}
             </button>
           ))}
+          {!api.demo && <SortAgainButton m={m} close={() => setOpen(false)} />}
           <hr />
           <button
             onClick={() => {
@@ -277,6 +333,12 @@ function CategoryChip({ category, items, onJumpToItem }: ChipProps) {
           >
             Show in Docs
           </button>
+          {!api.demo && (
+            <>
+              <hr />
+              <DeleteMessageButton m={m} close={() => setOpen(false)} />
+            </>
+          )}
         </span>
       )}
     </span>
@@ -284,31 +346,16 @@ function CategoryChip({ category, items, onJumpToItem }: ChipProps) {
 }
 
 function MessageMenu({ m }: { m: Message }) {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref } = useMenu();
   return (
-    <span className="msg-menu">
-      <button className="msg-menu-btn" onClick={() => setOpen((o) => !o)} aria-label="More">
+    <span className={open ? "msg-menu open" : "msg-menu"} ref={ref}>
+      <button className="msg-menu-btn" onClick={() => setOpen((o) => !o)} aria-label="More" aria-expanded={open}>
         ···
       </button>
       {open && (
-        <span className="msg-menu-pop" onMouseLeave={() => setOpen(false)}>
-          <button
-            onClick={() => {
-              setOpen(false);
-              api.reorganize(m.id);
-            }}
-          >
-            Sort again
-          </button>
-          <button
-            className="danger"
-            onClick={() => {
-              setOpen(false);
-              if (confirm("Delete this message? Everything sorted from it is deleted too.")) api.remove(m.id);
-            }}
-          >
-            Delete
-          </button>
+        <span className="msg-menu-pop" ref={revealMenu}>
+          <SortAgainButton m={m} close={() => setOpen(false)} />
+          <DeleteMessageButton m={m} close={() => setOpen(false)} />
         </span>
       )}
     </span>

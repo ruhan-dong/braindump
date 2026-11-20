@@ -125,11 +125,11 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .status.error { border: 0; background: none; color: #d44c47; padding: 0; text-decoration: underline; font-size: 12px; }
 @keyframes pulse { 50% { opacity: 0.35; } }
 
-.msg-menu { position: relative; opacity: 0; transition: opacity 0.15s; }
-.msg:hover .msg-menu, .msg-menu:focus-within { opacity: 1; }
+.msg-menu { position: relative; opacity: 0.6; transition: opacity 0.15s; }
+.msg:hover .msg-menu, .msg-menu:focus-within, .msg-menu.open { opacity: 1; }
 .msg-menu-btn { border: 0; background: none; color: var(--muted); padding: 0 4px; border-radius: 4px; letter-spacing: 1px; }
 .msg-menu-btn:hover { background: var(--bg-hover); }
-.msg-menu-pop { position: absolute; right: 0; bottom: 100%; display: flex; flex-direction: column; background: var(--bg); border-radius: var(--radius); box-shadow: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1), 0 9px 24px rgba(15, 15, 15, 0.2); padding: 4px; z-index: 5; min-width: 110px; }
+.msg-menu-pop { position: absolute; right: 0; top: calc(100% + 4px); display: flex; flex-direction: column; background: var(--bg); border-radius: var(--radius); box-shadow: 0 0 0 1px rgba(15, 15, 15, 0.05), 0 3px 6px rgba(15, 15, 15, 0.1), 0 9px 24px rgba(15, 15, 15, 0.2); padding: 4px; z-index: 5; min-width: 110px; }
 .msg-menu-pop button { border: 0; background: none; text-align: left; padding: 5px 10px; border-radius: 4px; font-size: 13.5px; }
 .msg-menu-pop button:hover { background: var(--bg-hover); }
 .msg-menu-pop .danger { color: #d44c47; }
@@ -137,6 +137,7 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .msg-menu-pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .tag-menu { position: relative; display: inline-flex; }
 .tag-menu .msg-menu-pop { min-width: 150px; white-space: nowrap; }
+.tag-caret { margin-left: -1px; opacity: 0.6; }
 
 .flash { animation: flash 1.6s ease-out; }
 @keyframes flash { 0%, 35% { background-color: rgba(35, 131, 226, 0.12); box-shadow: 0 0 0 4px rgba(35, 131, 226, 0.12); } 100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; } }
