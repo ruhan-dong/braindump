@@ -402,7 +402,7 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .access-option p { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
 .access-option .btn { flex-shrink: 0; }
 .scan { margin-top: 14px; }
-.scan-label { font-size: 13.5px; }
+.scan-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; }
 .scan-bar { height: 6px; border-radius: 999px; background: var(--bg-hover); overflow: hidden; margin-top: 6px; }
 .scan-bar span { display: block; height: 100%; background: var(--link); transition: width 0.3s; }
 .access-folders { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }
