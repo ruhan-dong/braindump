@@ -3,28 +3,51 @@ import { api } from "../api.ts";
 import App from "../App.tsx";
 import { Landing } from "./Landing.tsx";
 
-type Screen = "landing" | "in" | "up";
+// The sign-in and sign-up pages each have their own address, so the back button, a reload or a shared link lands on them.
+const PATHS = { in: "/signin", up: "/signup" } as const;
 
 /** Shows the app to a signed-in user, and the landing page or sign-in page to everyone else. */
 export function AuthGate() {
   // undefined: still finding out. null: signed out.
   const [email, setEmail] = useState<string | null | undefined>(undefined);
-  // null until the visitor picks: the landing page, unless they came from the confirmation email.
-  const [screen, setScreen] = useState<Screen | null>(null);
-  useEffect(() => api.auth.onChange(setEmail), []);
+  const [path, setPath] = useState(location.pathname);
+
+  function go(to: string, replace = false) {
+    if (replace) history.replaceState(null, "", to);
+    else history.pushState(null, "", to);
+    setPath(to);
+  }
+
+  useEffect(() => {
+    const sync = () => setPath(location.pathname);
+    addEventListener("popstate", sync);
+    return () => removeEventListener("popstate", sync);
+  }, []);
+
+  useEffect(
+    () =>
+      api.auth.onChange((next) => {
+        const onAuthPage = location.pathname === PATHS.in || location.pathname === PATHS.up;
+        // Signed in: the app lives at the home address. Back from the confirmation email: straight to sign-in.
+        if (next !== null && onAuthPage) go("/", true);
+        else if (next === null && api.auth.justConfirmed() && !onAuthPage) go(PATHS.in, true);
+        setEmail(next);
+      }),
+    [],
+  );
 
   if (email === undefined) return null;
   if (email === null) {
-    const shown = screen ?? (api.auth.justConfirmed() ? "in" : "landing");
-    if (shown === "landing") return <Landing onSignIn={() => setScreen("in")} onSignUp={() => setScreen("up")} />;
-    return <Login key={shown} initialMode={shown} onBack={() => setScreen("landing")} />;
+    const mode = path === PATHS.in ? "in" : path === PATHS.up ? "up" : null;
+    if (!mode) return <Landing onSignIn={() => go(PATHS.in)} onSignUp={() => go(PATHS.up)} />;
+    // Switching between the two forms replaces the history entry, so the back button always returns to the landing page.
+    return <Login mode={mode} onSwitch={(m) => go(PATHS[m], true)} onBack={() => go("/")} />;
   }
   // The key makes the app start over when a different person signs in, so nothing of the last user's stays on screen.
   return <App key={email} email={email} />;
 }
 
-function Login({ initialMode, onBack }: { initialMode: "in" | "up"; onBack: () => void }) {
-  const [mode, setMode] = useState<"in" | "up">(initialMode);
+function Login({ mode, onSwitch, onBack }: { mode: "in" | "up"; onSwitch: (mode: "in" | "up") => void; onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,11 +75,11 @@ function Login({ initialMode, onBack }: { initialMode: "in" | "up"; onBack: () =
     setBusy(false);
   }
 
-  const switchTo = (next: "in" | "up") => {
-    setMode(next);
+  // A message about one form doesn't belong on the other, however the switch happened (link or back button).
+  useEffect(() => {
     setError(null);
     setConfirm(false);
-  };
+  }, [mode]);
 
   return (
     <div className="login">
@@ -92,7 +115,7 @@ function Login({ initialMode, onBack }: { initialMode: "in" | "up"; onBack: () =
 
         <p className="login-switch">
           {mode === "in" ? "New here? " : "Already have an account? "}
-          <button type="button" onClick={() => switchTo(mode === "in" ? "up" : "in")}>
+          <button type="button" onClick={() => onSwitch(mode === "in" ? "up" : "in")}>
             {mode === "in" ? "Create an account" : "Sign in"}
           </button>
         </p>

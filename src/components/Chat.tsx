@@ -100,7 +100,8 @@ export function Chat({ messages, onJumpToItem, account }: Props) {
       <Composer
         dropped={dropped}
         onDroppedConsumed={() => setDropped([])}
-        onOpenPhotos={api.demo ? undefined : openPhotos}
+        // Photo library is hidden for now: without onOpenPhotos the paperclip opens the file picker straight away. Put it back to bring it back.
+        // onOpenPhotos={api.demo ? undefined : openPhotos}
         scan={library.scan}
       />
       {dragging && <div className="drop-overlay">Drop to add</div>}

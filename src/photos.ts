@@ -130,13 +130,22 @@ async function readPhoto(folder: string, { path, file }: PhotoFile): Promise<{ m
   };
 }
 
-/** Reads every photo that's new or changed since the last scan and sends it to the library. Returns how many. */
-export async function indexPhotos(folder: Folder, files: PhotoFile[], onProgress: (done: number, total: number) => void): Promise<number> {
+/**
+ * Reads every photo that's new or changed since the last scan and sends it to the library. Returns how many.
+ * When `stop` is aborted it finishes the photo it's on and stops; the rest are picked up by the next scan.
+ */
+export async function indexPhotos(
+  folder: Folder,
+  files: PhotoFile[],
+  onProgress: (done: number, total: number) => void,
+  stop: AbortSignal,
+): Promise<number> {
   const known = new Set(await api.photos.known(folder.name));
   const todo = files.filter((p) => !known.has(`${p.path}|${p.file.size}|${p.file.lastModified}`));
   onProgress(0, todo.length);
   let done = 0;
   for (const p of todo) {
+    if (stop.aborted) break;
     try {
       const { meta, thumb } = await readPhoto(folder.name, p);
       await api.photos.add(meta, thumb);
@@ -145,5 +154,5 @@ export async function indexPhotos(folder: Folder, files: PhotoFile[], onProgress
     }
     onProgress(++done, todo.length);
   }
-  return todo.length;
+  return done;
 }

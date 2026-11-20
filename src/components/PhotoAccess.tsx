@@ -15,7 +15,7 @@ import {
 } from "../photos.ts";
 
 type LibraryFolder = { name: string; count: number; access: Access | null; local: Folder | null };
-export type Scan = { folder: string; done: number; total: number } | null;
+export type Scan = { folder: string; done: number; total: number; stopping: boolean } | null;
 
 /** Granted folders, how many photos each has in the library, and the scan in progress. */
 export function usePhotoLibrary() {
@@ -23,6 +23,16 @@ export function usePhotoLibrary() {
   const [scan, setScan] = useState<Scan>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
+  // Aborting it stops the scan in progress, and the startup rescan of the folders after it.
+  const stopper = useRef(new AbortController());
+  // Settles once the scan in progress has ended.
+  const ended = useRef<Promise<void>>(Promise.resolve());
+
+  const stop = useCallback(() => {
+    stopper.current.abort();
+    setScan((s) => s && { ...s, stopping: true });
+    return ended.current;
+  }, []);
 
   const refresh = useCallback(async () => {
     const [{ folders: counts }, local] = await Promise.all([api.photos.folders(), savedFolders()]);
@@ -35,22 +45,30 @@ export function usePhotoLibrary() {
     );
   }, []);
 
+  /** `job` is shared by the scans of one startup rescan, so stopping one stops the rest. */
   const run = useCallback(
-    async (folder: Folder, files: () => Promise<PhotoFile[]>) => {
-      if (busy.current) return;
+    async (folder: Folder, files: () => Promise<PhotoFile[]>, job = new AbortController()) => {
+      if (busy.current || job.signal.aborted) return;
       busy.current = true;
+      stopper.current = job;
       setError(null);
-      setScan({ folder: folder.name, done: 0, total: 0 });
-      try {
-        await indexPhotos(folder, await files(), (done, total) => setScan({ folder: folder.name, done, total }));
-      } catch (err) {
-        console.error(err);
-        setError(`Couldn't read the photos in “${folder.name}”.`);
-      } finally {
-        busy.current = false;
-        setScan(null);
-        refresh();
-      }
+      setScan({ folder: folder.name, done: 0, total: 0, stopping: false });
+      const scanning = (async () => {
+        try {
+          const onProgress = (done: number, total: number) => setScan({ folder: folder.name, done, total, stopping: job.signal.aborted });
+          await indexPhotos(folder, await files(), onProgress, job.signal);
+        } catch (err) {
+          console.error(err);
+          setError(`Couldn't read the photos in “${folder.name}”.`);
+        } finally {
+          busy.current = false;
+          setScan(null);
+          // Awaited, so a Remove waiting on this scan refreshes after it and the removed folder doesn't come back.
+          await refresh().catch(console.error);
+        }
+      })();
+      ended.current = scanning;
+      await scanning;
     },
     [refresh],
   );
@@ -58,15 +76,19 @@ export function usePhotoLibrary() {
   // Pick up new photos in folders the browser still has access to, without asking.
   useEffect(() => {
     if (api.demo) return;
+    const job = new AbortController();
+    stopper.current = job;
     refresh().then(async () => {
-      for (const f of await savedFolders()) if (await hasPermission(f, false)) await run(f, () => listPhotoFiles(f));
+      for (const f of await savedFolders()) if (await hasPermission(f, false)) await run(f, () => listPhotoFiles(f), job);
     });
+    return () => job.abort();
   }, [refresh, run]);
 
   return {
     folders,
     scan,
     error,
+    stop,
     async add(access: Access) {
       try {
         const folder = await pickFolder(access);
@@ -87,6 +109,8 @@ export function usePhotoLibrary() {
       else setError(`BrainDump no longer has access to “${f.name}”. Choose it again to give access.`);
     },
     async remove(f: LibraryFolder) {
+      // A scan still running would add photos back after the folder is gone, so it ends first.
+      await stop();
       await forgetFolder(f.name);
       await api.photos.removeFolder(f.name);
       refresh();
@@ -158,7 +182,10 @@ export function PhotoAccessDialog({ library, onClose }: { library: PhotoLibrary;
         {scan && (
           <div className="scan">
             <div className="scan-label">
-              {scan.total === 0 ? `Looking in “${scan.folder}”…` : `Reading photos in “${scan.folder}”: ${scan.done} of ${scan.total}`}
+              <span>{scan.total === 0 ? `Looking in “${scan.folder}”…` : `Reading photos in “${scan.folder}”: ${scan.done} of ${scan.total}`}</span>
+              <button type="button" className="link-btn" onClick={library.stop} disabled={scan.stopping}>
+                {scan.stopping ? "Stopping…" : "Stop"}
+              </button>
             </div>
             <div className="scan-bar">
               <span style={{ width: scan.total ? `${(scan.done / scan.total) * 100}%` : "0%" }} />
@@ -180,7 +207,7 @@ export function PhotoAccessDialog({ library, onClose }: { library: PhotoLibrary;
                     Rescan
                   </button>
                 )}
-                <button type="button" className="link-btn danger" onClick={() => library.remove(f)} disabled={!!scan}>
+                <button type="button" className="link-btn danger" onClick={() => library.remove(f)}>
                   Remove
                 </button>
               </li>
