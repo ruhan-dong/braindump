@@ -4,7 +4,7 @@ import { CATEGORIES } from "../../shared/categories.ts";
 import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, hash, headline, toEntries, visualOf, type Entry } from "../doc.ts";
 import { COVERS } from "../covers.ts";
-import { FileChip, Linkified, VoiceNote } from "./Media.tsx";
+import { FileChip, ImageLink, Linkified, VoiceNote } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 
 type Props = { messages: Message[]; onJumpToMessage: (id: string) => void };
@@ -160,9 +160,7 @@ function Photos({ list, onJump }: { list: Entry[]; onJump: Jump }) {
         return (
           <figure key={e.id} id={`item-${e.id}`} className="j-item photo">
             {src ? (
-              <a href={e.link?.url ?? src} target="_blank" rel="noreferrer">
-                <img src={src} alt={e.title} loading="lazy" />
-              </a>
+              <ImageLink src={src} alt={e.title} href={e.link?.url} />
             ) : (
               <video src={e.attachment!.url} controls preload="metadata" />
             )}
@@ -183,9 +181,7 @@ function Moodboard({ list, onJump }: { list: Entry[]; onJump: Jump }) {
     <div className="moodboard">
       {list.map((e) => (
         <figure key={e.id} id={`item-${e.id}`} className="j-item mood">
-          <a href={e.link?.url ?? visualOf(e)} target="_blank" rel="noreferrer">
-            <img src={visualOf(e)} alt={e.title} loading="lazy" />
-          </a>
+          <ImageLink src={visualOf(e)!} alt={e.title} href={e.link?.url} />
           {(e.body || e.title) && <figcaption>{e.body || e.title}</figcaption>}
           <Hover e={e} onJump={onJump} />
         </figure>

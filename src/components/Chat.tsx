@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { api, type Item, type Message, type Photo, type Recall } from "../api.ts";
 import { CATEGORIES } from "../../shared/categories.ts";
 import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
-import { AttachmentView, LinkCard, Linkified } from "./Media.tsx";
+import { AttachmentView, ImageLink, LinkCard, Linkified } from "./Media.tsx";
 import { Composer } from "./Composer.tsx";
 import { PhotoAccessDialog, usePhotoLibrary } from "./PhotoAccess.tsx";
 import { COVERS } from "../covers.ts";
@@ -190,9 +190,7 @@ function RecallPhoto({ photo }: { photo: Photo }) {
   const when = photo.taken_at ? new Date(photo.taken_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
   return (
     <figure className="recall-photo">
-      <a href={photo.url} target="_blank" rel="noreferrer">
-        <img src={photo.url} alt={photo.path} loading="lazy" />
-      </a>
+      <ImageLink src={photo.url} alt={photo.path} />
       <figcaption>
         <span className="recall-path" title={`${photo.folder}/${photo.path}`}>
           {photo.path.split("/").pop()}

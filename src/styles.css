@@ -381,6 +381,12 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .dialog-error { margin: 8px 0 0; font-size: 13px; color: #d44c47; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
+/* ---------- Image viewer ---------- */
+.viewer { position: fixed; inset: 0; z-index: 60; background: rgba(15, 15, 15, 0.88); display: grid; place-items: center; padding: 56px 16px; }
+.viewer img { max-width: 100%; max-height: calc(100vh - 112px); max-height: calc(100dvh - 112px); object-fit: contain; border-radius: 4px; }
+.viewer-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 22px; line-height: 1; }
+.viewer-close:hover { background: rgba(255, 255, 255, 0.26); }
+
 /* ---------- Sign in ---------- */
 .login { min-height: 100vh; min-height: 100dvh; display: grid; place-items: start center; padding: 14vh 16px 24px; background: var(--bg-soft); }
 .login-card { width: 100%; max-width: 380px; background: var(--bg); border-radius: 10px; padding: 26px 24px 20px; box-shadow: 0 0 0 1px var(--line), 0 4px 16px rgba(15, 15, 15, 0.06); }

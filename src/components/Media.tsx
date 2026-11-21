@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Attachment, Link } from "../api.ts";
 import { formatSize } from "../format.ts";
 
@@ -42,13 +44,50 @@ export function VoiceNote({ a }: { a: Attachment }) {
   );
 }
 
-export function AttachmentView({ a }: { a: Attachment }) {
-  if (a.kind === "image")
-    return (
-      <a className="att-image" href={a.url} target="_blank" rel="noreferrer">
-        <img src={a.url} alt={a.filename} loading="lazy" />
+/** One picture over the whole window. Closes on the × button, a click on the dark area, or Escape. */
+function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={alt} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <button className="viewer-close" onClick={onClose} aria-label="Close" autoFocus>
+        ×
+      </button>
+      <img src={src} alt={alt} />
+    </div>,
+    document.body,
+  );
+}
+
+/** A picture that opens in the viewer when clicked. With `href` (a link's preview image) it opens that page instead. */
+export function ImageLink({ src, alt, href, className }: { src: string; alt: string; href?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <a
+        className={className}
+        href={href ?? src}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => {
+          if (href) return;
+          e.preventDefault();
+          setOpen(true);
+        }}
+      >
+        <img src={src} alt={alt} loading="lazy" />
       </a>
-    );
+      {open && <ImageViewer src={src} alt={alt} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+export function AttachmentView({ a }: { a: Attachment }) {
+  if (a.kind === "image") return <ImageLink className="att-image" src={a.url} alt={a.filename} />;
   if (a.kind === "video") return <video className="att-video" src={a.url} controls preload="metadata" />;
   if (a.kind === "audio") return <VoiceNote a={a} />;
   return <FileChip a={a} />;
