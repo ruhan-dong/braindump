@@ -4,7 +4,7 @@ import { CATEGORIES, categoryOf } from "../../shared/categories.ts";
 import type { TemplateSpec } from "../../shared/templates.ts";
 import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts";
-import { AttachmentView, LinkCard } from "./Media.tsx";
+import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 import { EmptyDoc } from "./JournalView.tsx";
 
@@ -102,7 +102,7 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
         </div>
         {spec.note && <p className="tpl-note">{spec.note}</p>}
         {spec.groupBy === "topic" && entries.length > 0 && !entries.some((e) => e.topic) && (
-          <p className="tpl-note">These entries don't have topics yet, so they're shown together. Topics are added when Claude sorts your entries.</p>
+          <p className="tpl-note">These entries don't have topics yet, so they're shown together. Topics are added when Claude organizes your entries.</p>
         )}
       </header>
 
@@ -191,9 +191,7 @@ function Layout({ spec, list, showCategory, onJump }: { spec: TemplateSpec; list
           {list.map((e) => (
             <figure key={e.id} id={`item-${e.id}`} className={`org-item tpl-tile ${visualOf(e) ? "" : "text-tile"}`}>
               {visualOf(e) ? (
-                <a href={e.link?.url ?? visualOf(e)} target="_blank" rel="noreferrer">
-                  <img src={visualOf(e)} alt={e.title} loading="lazy" />
-                </a>
+                <ImageLink src={visualOf(e)!} alt={e.title} href={e.link?.url} />
               ) : (
                 e.attachment && <AttachmentView a={e.attachment} />
               )}

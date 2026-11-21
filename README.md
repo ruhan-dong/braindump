@@ -27,7 +27,7 @@ npm run dev            # http://localhost:5173
 
 Open the app and create an account. You need Node 23.4 or newer.
 
-New accounts start with an empty log. The repo ships with sample data in `seed/` (a log, its images and voice memos, and a few custom templates). To copy it into an account that is still empty, run `npm run seed:import you@example.com`.
+New accounts start with an empty log and four starter templates (Weekly review, Reading list, Moodboard gallery, Open to-dos), added by the database when the account is created (`supabase/migrations/0003_starter_templates.sql`). The repo ships with sample data in `seed/` (a log, its images and voice memos, and the same four templates). To copy it into an account that has no notes yet, run `npm run seed:import you@example.com`.
 
 If you don't set `ANTHROPIC_API_KEY`, a rule-based categorizer is used instead. It handles the obvious cases: links, images, bulleted to-do lists, and "Idea:" prefixes.
 

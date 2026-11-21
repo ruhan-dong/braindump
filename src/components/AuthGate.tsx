@@ -3,8 +3,9 @@ import { api } from "../api.ts";
 import App from "../App.tsx";
 import { Landing } from "./Landing.tsx";
 
-// The sign-in and sign-up pages each have their own address, so the back button, a reload or a shared link lands on them.
-const PATHS = { in: "/signin", up: "/signup" } as const;
+// The sign-in page, the sign-up page and the app each have their own address, so the back button, a reload or a shared
+// link lands on them, and the app's address is not the landing page's.
+const PATHS = { in: "/signin", up: "/signup", app: "/app" } as const;
 
 /** Shows the app to a signed-in user, and the landing page or sign-in page to everyone else. */
 export function AuthGate() {
@@ -24,17 +25,25 @@ export function AuthGate() {
     return () => removeEventListener("popstate", sync);
   }, []);
 
-  useEffect(
-    () =>
-      api.auth.onChange((next) => {
-        const onAuthPage = location.pathname === PATHS.in || location.pathname === PATHS.up;
-        // Signed in: the app lives at the home address. Back from the confirmation email: straight to sign-in.
-        if (next !== null && onAuthPage) go("/", true);
-        else if (next === null && api.auth.justConfirmed() && !onAuthPage) go(PATHS.in, true);
-        setEmail(next);
-      }),
-    [],
-  );
+  useEffect(() => {
+    let signedIn = false;
+    return api.auth.onChange((next) => {
+      const at = location.pathname;
+      const onAuthPage = at === PATHS.in || at === PATHS.up;
+      // Signed out of the app: back to the landing page. Opened the app's address while signed out, or back from the
+      // confirmation email: straight to sign-in.
+      if (next === null && at === PATHS.app) go(signedIn ? "/" : PATHS.in, true);
+      else if (next === null && api.auth.justConfirmed() && !onAuthPage) go(PATHS.in, true);
+      signedIn = next !== null;
+      setEmail(next);
+    });
+  }, []);
+
+  // A signed-in user is always at the app's address, however they got here: signing in, a link, the back button.
+  // The demo is a single page with no addresses of its own.
+  useEffect(() => {
+    if (email && path !== PATHS.app && !api.demo) go(PATHS.app, true);
+  }, [email, path]);
 
   if (email === undefined) return null;
   if (email === null) {

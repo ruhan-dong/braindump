@@ -3,7 +3,7 @@ import { api, type Message } from "../api.ts";
 import { CATEGORIES, type CategoryId } from "../../shared/categories.ts";
 import { formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts";
-import { AttachmentView, LinkCard } from "./Media.tsx";
+import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 import { EmptyDoc } from "./JournalView.tsx";
 import { COVERS } from "../covers.ts";
@@ -130,9 +130,7 @@ function Tile({ e, onJump }: { e: Entry; onJump: Jump }) {
   return (
     <figure className="org-item tile" id={`item-${e.id}`}>
       {src ? (
-        <a href={e.link?.url ?? src} target="_blank" rel="noreferrer">
-          <img src={src} alt={e.title} loading="lazy" />
-        </a>
+        <ImageLink src={src} alt={e.title} href={e.link?.url} />
       ) : (
         <video src={e.attachment!.url} controls preload="metadata" />
       )}

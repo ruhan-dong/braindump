@@ -151,19 +151,16 @@ export default function App({ email }: { email: string }) {
             💬 Log
           </button>
           <button className={pane === "doc" ? "on" : ""} onClick={() => setPane("doc")}>
-            📄 Docs
+            📄 Notebook
           </button>
         </div>
-        {/* How messages get sorted, kept small in the bottom-right corner so it stays out of the way. */}
-        {api.demo ? (
-          <span className="ai-badge">Demo</span>
-        ) : (
-          ai !== null && (
-            <span className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Sorted automatically by Claude" : "Set ANTHROPIC_API_KEY to turn on AI sorting"}>
-              {ai ? "✦ Sorted by Claude" : "Rule-based sorting"}
-            </span>
-          )
-        )}
+        {api.demo && <span className="ai-badge">Demo</span>}
+        {/* How messages get sorted, kept small in the bottom-right corner so it stays out of the way. Hidden for now: put it back to bring it back.
+        {!api.demo && ai !== null && (
+          <span className={`ai-badge ${ai ? "on" : ""}`} title={ai ? "Sorted automatically by Claude" : "Set ANTHROPIC_API_KEY to turn on AI sorting"}>
+            {ai ? "✦ Sorted by Claude" : "Rule-based sorting"}
+          </span>
+        )} */}
       </nav>
 
       {dialog && (

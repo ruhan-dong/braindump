@@ -4,7 +4,7 @@ import { CATEGORIES } from "../../shared/categories.ts";
 import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, hash, headline, toEntries, visualOf, type Entry } from "../doc.ts";
 import { COVERS } from "../covers.ts";
-import { FileChip, Linkified, VoiceNote } from "./Media.tsx";
+import { FileChip, ImageLink, Linkified, VoiceNote } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 
 type Props = { messages: Message[]; onJumpToMessage: (id: string) => void };
@@ -57,7 +57,7 @@ function DayPage({ day, msgs, onJump }: { day: string; msgs: Message[]; onJump: 
   if (links.length) modules.push({ key: "links", wide: links.length > 2, count: links.length, label: "Further reading", node: <Reading list={links} onJump={onJump} /> });
   if (voices.length) modules.push({ key: "voices", wide: false, count: voices.length, label: "Voice memos", node: <Voices list={voices} onJump={onJump} /> });
   if (files.length) modules.push({ key: "files", wide: false, count: files.length, label: "Files", node: <Files list={files} onJump={onJump} /> });
-  if (pending.length) modules.push({ key: "pending", wide: false, count: pending.length, label: "Sorting…", node: <Pending msgs={pending} /> });
+  if (pending.length) modules.push({ key: "pending", wide: false, count: pending.length, label: "Organizing…", node: <Pending msgs={pending} /> });
 
   const counts = CATEGORIES.map((c) => ({ c, n: entries.filter((e) => e.category === c.id).length })).filter((x) => x.n);
 
@@ -69,7 +69,7 @@ function DayPage({ day, msgs, onJump }: { day: string; msgs: Message[]; onJump: 
           {d.weekday}
         </div>
         <h2 className="issue-title">{d.date}</h2>
-        <p className="issue-dek">{counts.map(({ c, n }) => `${n} ${c.unit[n === 1 ? 0 : 1]}`).join(" · ") || "Sorting…"}</p>
+        <p className="issue-dek">{counts.map(({ c, n }) => `${n} ${c.unit[n === 1 ? 0 : 1]}`).join(" · ") || "Organizing…"}</p>
       </header>
       <div className="spread">{arrange(modules, day)}</div>
     </article>
@@ -160,9 +160,7 @@ function Photos({ list, onJump }: { list: Entry[]; onJump: Jump }) {
         return (
           <figure key={e.id} id={`item-${e.id}`} className="j-item photo">
             {src ? (
-              <a href={e.link?.url ?? src} target="_blank" rel="noreferrer">
-                <img src={src} alt={e.title} loading="lazy" />
-              </a>
+              <ImageLink src={src} alt={e.title} href={e.link?.url} />
             ) : (
               <video src={e.attachment!.url} controls preload="metadata" />
             )}
@@ -183,9 +181,7 @@ function Moodboard({ list, onJump }: { list: Entry[]; onJump: Jump }) {
     <div className="moodboard">
       {list.map((e) => (
         <figure key={e.id} id={`item-${e.id}`} className="j-item mood">
-          <a href={e.link?.url ?? visualOf(e)} target="_blank" rel="noreferrer">
-            <img src={visualOf(e)} alt={e.title} loading="lazy" />
-          </a>
+          <ImageLink src={visualOf(e)!} alt={e.title} href={e.link?.url} />
           {(e.body || e.title) && <figcaption>{e.body || e.title}</figcaption>}
           <Hover e={e} onJump={onJump} />
         </figure>
