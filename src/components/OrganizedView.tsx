@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { api, type Message } from "../api.ts";
 import { CATEGORIES, type CategoryId } from "../../shared/categories.ts";
 import { formatDay, formatTime, groupBy } from "../format.ts";
@@ -8,11 +7,23 @@ import { ItemActions } from "./ItemActions.tsx";
 import { EmptyDoc } from "./JournalView.tsx";
 import { COVERS } from "../covers.ts";
 
-type Props = { messages: Message[]; onJumpToMessage: (id: string) => void };
+/** Whether completed to-dos are listed, and the switch for it. Kept by the app so it is remembered and a jump can open it. */
+export type DoneToggle = { showDone: boolean; onToggleDone: () => void };
+
+/** The "Completed N" line that opens and closes a list of completed to-dos. */
+export function CompletedToggle({ count, showDone, onToggleDone }: { count: number } & DoneToggle) {
+  return (
+    <button className="todo-done-toggle" onClick={onToggleDone}>
+      {showDone ? "▾" : "▸"} Completed {count}
+    </button>
+  );
+}
+
+type Props = { messages: Message[]; onJumpToMessage: (id: string) => void } & DoneToggle;
 type Jump = (id: string) => void;
 
 /** Intent template: everything regrouped by what the user meant (to-do, link, inspiration…), then by topic. */
-export function OrganizedView({ messages, onJumpToMessage }: Props) {
+export function OrganizedView({ messages, onJumpToMessage, showDone, onToggleDone }: Props) {
   const entries = messages.flatMap(toEntries);
   if (!entries.length) return <EmptyDoc />;
   const sections = CATEGORIES.map((c) => ({ ...c, list: entries.filter((e) => e.category === c.id) })).filter((s) => s.list.length);
@@ -44,7 +55,7 @@ export function OrganizedView({ messages, onJumpToMessage }: Props) {
             {s.label}
             <span className="org-sec-count">{s.list.length}</span>
           </h2>
-          {s.id === "todo" ? <TodoSection list={s.list} onJump={onJumpToMessage} /> : <Topics id={s.id} list={newestFirst(s.list)} onJump={onJumpToMessage} />}
+          {s.id === "todo" ? <TodoSection list={s.list} onJump={onJumpToMessage} showDone={showDone} onToggleDone={onToggleDone} /> : <Topics id={s.id} list={newestFirst(s.list)} onJump={onJumpToMessage} />}
         </section>
       ))}
     </div>
@@ -152,8 +163,7 @@ function Meta({ e, onJump }: { e: Entry; onJump: Jump }) {
   );
 }
 
-function TodoSection({ list, onJump }: { list: Entry[]; onJump: Jump }) {
-  const [showDone, setShowDone] = useState(false);
+function TodoSection({ list, onJump, showDone, onToggleDone }: { list: Entry[]; onJump: Jump } & DoneToggle) {
   const open = list.filter((e) => !e.done);
   const done = list.filter((e) => e.done);
   const groups = groupBy(open, (e) => e.topic ?? "").sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : 0));
@@ -173,9 +183,7 @@ function TodoSection({ list, onJump }: { list: Entry[]; onJump: Jump }) {
       ))}
       {done.length > 0 && (
         <>
-          <button className="todo-done-toggle" onClick={() => setShowDone((s) => !s)}>
-            {showDone ? "▾" : "▸"} Completed {done.length}
-          </button>
+          <CompletedToggle count={done.length} showDone={showDone} onToggleDone={onToggleDone} />
           {showDone && (
             <ul className="todo-list done-list">
               {done.map((e) => (
