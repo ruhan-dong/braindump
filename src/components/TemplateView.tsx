@@ -102,7 +102,7 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
         </div>
         {spec.note && <p className="tpl-note">{spec.note}</p>}
         {spec.groupBy === "topic" && entries.length > 0 && !entries.some((e) => e.topic) && (
-          <p className="tpl-note">These entries don't have topics yet, so they're shown together. Topics are added when Claude sorts your entries.</p>
+          <p className="tpl-note">These entries don't have topics yet, so they're shown together. Topics are added when Claude organizes your entries.</p>
         )}
       </header>
 

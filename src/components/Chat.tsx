@@ -76,7 +76,7 @@ export function Chat({ messages, onJumpToItem, account }: Props) {
           <div className="empty">
             <img src={COVERS.toast} alt="" />
             <h2>Empty your head here</h2>
-            <p>To-dos, ideas, links, screenshots, inspiration, voice memos. Send them as they come and Docs sorts them for you.</p>
+            <p>To-dos, ideas, links, screenshots, inspiration, voice memos. Send them as they come and your Notebook auto-organizes them for you.</p>
           </div>
         )}
         {groupBy(messages, (m) => dayKey(m.created_at)).map(([day, msgs]) => {
@@ -169,7 +169,7 @@ function RecallCard({ recall, todo, onOpenPhotos, onJumpToItem }: RecallCardProp
     <div className="recall">
       <div className="recall-head">🔎 {note ?? `Found ${photos.length} ${photos.length === 1 ? "photo" : "photos"} for ${quoted}`}</div>
       {todo && (
-        <button className="recall-todo" onClick={() => onJumpToItem(todo.id)} title="Show in Docs">
+        <button className="recall-todo" onClick={() => onJumpToItem(todo.id)} title="Show in Notebook">
           ✅ Added to your to-dos: <strong>{todo.title}</strong>
           {todo.body && <small>{todo.body}</small>}
         </button>
@@ -225,11 +225,11 @@ function RecallPhoto({ photo }: { photo: Photo }) {
 }
 
 function Status({ m, onJumpToItem }: { m: Message; onJumpToItem: (itemId: string) => void }) {
-  if (m.status === "pending") return <span className="status pending">Sorting…</span>;
+  if (m.status === "pending") return <span className="status pending">Organizing…</span>;
   if (m.status === "error")
     return (
       <button className="status error" onClick={() => api.reorganize(m.id)}>
-        Couldn't sort · Retry
+        Couldn't organize · Retry
       </button>
     );
   return (
@@ -276,7 +276,7 @@ function SortAgainButton({ m, close }: ActionProps) {
         api.reorganize(m.id);
       }}
     >
-      Try auto sort again
+      Recategorize with AI
     </button>
   );
 }
@@ -297,7 +297,7 @@ function DeleteMessageButton({ m, close }: ActionProps) {
 
 type ChipProps = { m: Message; category: (typeof CATEGORIES)[number]; items: Item[]; onJumpToItem: (itemId: string) => void };
 
-/** A category tag that opens a menu: move its items to another category, show them in Docs, or act on the message. */
+/** A category tag that opens a menu: move its items to another category, show them in Notebook, or act on the message. */
 function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
   const { open, setOpen, ref } = useMenu();
 
@@ -330,7 +330,7 @@ function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
               onJumpToItem(items[0].id);
             }}
           >
-            Show in Docs
+            Show in Notebook
           </button>
           {!api.demo && (
             <>

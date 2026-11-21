@@ -309,7 +309,7 @@ export function Composer({ dropped, onDroppedConsumed, onOpenPhotos, scan }: Pro
             ref={textRef}
             rows={1}
             value={text}
-            placeholder={listening ? "Listening… your words appear here" : "Dump anything here… text, links, images, voice"}
+            placeholder={listening ? "Listening… your words appear here" : "Dump anything here… text, links, images, files, voice"}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               // isComposing: don't send while an IME (e.g. pinyin) candidate is being picked.

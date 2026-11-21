@@ -43,7 +43,7 @@ img, video { max-width: 100%; display: block; }
 .chat, .doc { grid-row: 1; grid-column: 1; min-height: 0; }
 .app.pane-chat .doc, .app.pane-doc .chat { display: none; }
 
-/* Log / Docs switch in the middle column, the sorting label in the right one. */
+/* Log / Notebook switch in the middle column, the sorting label in the right one. */
 .pane-switch { grid-row: 2; display: grid; grid-template-columns: 1fr minmax(0, 760px) 1fr; align-items: center; column-gap: 12px; border-top: 1px solid var(--line); background: var(--bg); padding: 6px 16px calc(6px + env(safe-area-inset-bottom)); }
 .pane-switch-inner { grid-column: 2; display: flex; gap: 6px; width: 100%; }
 .pane-switch button { flex: 1; border: 0; background: none; padding: 8px; border-radius: var(--radius); color: var(--muted); font-size: 14px; }

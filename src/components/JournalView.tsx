@@ -57,7 +57,7 @@ function DayPage({ day, msgs, onJump }: { day: string; msgs: Message[]; onJump: 
   if (links.length) modules.push({ key: "links", wide: links.length > 2, count: links.length, label: "Further reading", node: <Reading list={links} onJump={onJump} /> });
   if (voices.length) modules.push({ key: "voices", wide: false, count: voices.length, label: "Voice memos", node: <Voices list={voices} onJump={onJump} /> });
   if (files.length) modules.push({ key: "files", wide: false, count: files.length, label: "Files", node: <Files list={files} onJump={onJump} /> });
-  if (pending.length) modules.push({ key: "pending", wide: false, count: pending.length, label: "Sorting…", node: <Pending msgs={pending} /> });
+  if (pending.length) modules.push({ key: "pending", wide: false, count: pending.length, label: "Organizing…", node: <Pending msgs={pending} /> });
 
   const counts = CATEGORIES.map((c) => ({ c, n: entries.filter((e) => e.category === c.id).length })).filter((x) => x.n);
 
@@ -69,7 +69,7 @@ function DayPage({ day, msgs, onJump }: { day: string; msgs: Message[]; onJump: 
           {d.weekday}
         </div>
         <h2 className="issue-title">{d.date}</h2>
-        <p className="issue-dek">{counts.map(({ c, n }) => `${n} ${c.unit[n === 1 ? 0 : 1]}`).join(" · ") || "Sorting…"}</p>
+        <p className="issue-dek">{counts.map(({ c, n }) => `${n} ${c.unit[n === 1 ? 0 : 1]}`).join(" · ") || "Organizing…"}</p>
       </header>
       <div className="spread">{arrange(modules, day)}</div>
     </article>
