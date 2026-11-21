@@ -17,17 +17,26 @@ const savedView = (): View => {
   }
 };
 
+/** Whether the "Completed" list of to-dos is open, in Organized and in templates that set completed ones aside. Open unless the user collapsed it. */
+const savedShowDone = (): boolean => {
+  try {
+    return localStorage.getItem("braindump.showDone") !== "0";
+  } catch {
+    return true;
+  }
+};
+
 function upsert(list: Message[], m: Message) {
   const next = list.filter((x) => x.id !== m.id);
   next.push(m);
   return next.sort((a, b) => a.created_at - b.created_at);
 }
 
-/** Scrolls an element into view and briefly highlights it. Calls onMissing if it isn't on the page. */
-function flash(id: string, onMissing?: () => void) {
+/** Scrolls an element into view and briefly highlights it, once the page has been updated. */
+function flash(id: string) {
   requestAnimationFrame(() => {
     const el = document.getElementById(id);
-    if (!el) return onMissing?.();
+    if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     el.classList.remove("flash");
     void el.offsetWidth; // restart the animation if it's already flashing
@@ -40,6 +49,7 @@ export default function App({ email }: { email: string }) {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [ai, setAi] = useState<boolean | null>(null);
   const [view, setView] = useState<View>(savedView);
+  const [showDone, setShowDone] = useState(savedShowDone);
   const [pane, setPane] = useState<"chat" | "doc">("chat"); // which pane is visible
   const [dialog, setDialog] = useState<{ editing?: Template } | null>(null);
 
@@ -68,14 +78,26 @@ export default function App({ email }: { email: string }) {
     }
   }, [activeView]);
 
-  const jumpToItem = useCallback((itemId: string) => {
-    setPane("doc");
-    // A custom template may leave the item out; Organized always shows everything.
-    flash(`item-${itemId}`, () => {
+  useEffect(() => {
+    try {
+      localStorage.setItem("braindump.showDone", showDone ? "1" : "0");
+    } catch {
+      // storage unavailable; the choice just won't persist
+    }
+  }, [showDone]);
+
+  const jumpToItem = useCallback(
+    (itemId: string) => {
+      setPane("doc");
+      // Always shown in Organized, which lists every item. A completed to-do is only on the page while "Completed" is open.
       setView("organized");
-      setTimeout(() => flash(`item-${itemId}`), 50);
-    });
-  }, []);
+      if (messages.some((m) => m.items.some((i) => i.id === itemId && i.category === "todo" && i.done))) setShowDone(true);
+      flash(`item-${itemId}`);
+    },
+    [messages],
+  );
+
+  const toggleDone = useCallback(() => setShowDone((s) => !s), []);
 
   const jumpToMessage = useCallback((messageId: string) => {
     setPane("chat");
@@ -131,7 +153,7 @@ export default function App({ email }: { email: string }) {
           {activeView === "journal" ? (
             <JournalView messages={messages} onJumpToMessage={jumpToMessage} />
           ) : activeView === "organized" ? (
-            <OrganizedView messages={messages} onJumpToMessage={jumpToMessage} />
+            <OrganizedView messages={messages} onJumpToMessage={jumpToMessage} showDone={showDone} onToggleDone={toggleDone} />
           ) : current ? (
             <TemplateView
               key={current.id}
@@ -140,6 +162,8 @@ export default function App({ email }: { email: string }) {
               onJumpToMessage={jumpToMessage}
               onEdit={() => setDialog({ editing: current })}
               onDelete={() => deleteTemplate(current.id)}
+              showDone={showDone}
+              onToggleDone={toggleDone}
             />
           ) : null}
         </div>

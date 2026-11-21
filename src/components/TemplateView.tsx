@@ -7,6 +7,7 @@ import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts"
 import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 import { EmptyDoc } from "./JournalView.tsx";
+import { CompletedToggle, type DoneToggle } from "./OrganizedView.tsx";
 
 type Props = {
   template: Template;
@@ -14,7 +15,7 @@ type Props = {
   onJumpToMessage: (id: string) => void;
   onEdit: () => void;
   onDelete: () => void;
-};
+} & DoneToggle;
 type Jump = (id: string) => void;
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -62,15 +63,17 @@ function group(by: TemplateSpec["groupBy"], list: Entry[]): { key: string; label
   }
 }
 
-export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDelete }: Props) {
+export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDelete, showDone, onToggleDone }: Props) {
   const { spec } = template;
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const entries = messages
+  const all = messages
     .flatMap(toEntries)
     .filter((e) => spec.include.length === 0 || spec.include.includes(e.category as never))
-    .filter((e) => !(spec.hideDone && e.done))
     .sort((a, b) => (spec.sort === "newest" ? -1 : 1) * (a.message.created_at - b.message.created_at));
+  // A template that leaves out completed to-dos lists them at the end instead, under "Completed", the way Organized does.
+  const done = spec.hideDone ? all.filter((e) => e.done) : [];
+  const entries = spec.hideDone ? all.filter((e) => !e.done) : all;
   // Topics are only added when Claude organizes the entries. With none, a topic template groups by category instead,
   // or stays one plain list when everything is in the same category.
   const noTopics = spec.groupBy === "topic" && !entries.some((e) => e.topic);
@@ -106,24 +109,38 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
         {spec.note && <p className="tpl-note">{spec.note}</p>}
       </header>
 
-      {entries.length === 0 ? (
+      {all.length === 0 ? (
         messages.length === 0 ? (
           <EmptyDoc />
         ) : (
           <p className="tpl-empty">Nothing matches this template yet. Edit the prompt to include more, or add entries in the Log.</p>
         )
       ) : (
-        groups.map((g) => (
-          <section className="tpl-group" key={g.key}>
-            {g.label && (
-              <h2>
-                {g.label}
-                <span className="tpl-count">{g.entries.length}</span>
-              </h2>
-            )}
-            <Layout spec={spec} list={g.entries} showCategory={showCategory} onJump={onJumpToMessage} />
-          </section>
-        ))
+        <>
+          {entries.length > 0 &&
+            groups.map((g) => (
+              <section className="tpl-group" key={g.key}>
+                {g.label && (
+                  <h2>
+                    {g.label}
+                    <span className="tpl-count">{g.entries.length}</span>
+                  </h2>
+                )}
+                <Layout spec={spec} list={g.entries} showCategory={showCategory} onJump={onJumpToMessage} />
+              </section>
+            ))}
+          {done.length > 0 && (
+            <section className="tpl-group">
+              {entries.length === 0 && <p className="todo-clear">All done 🎉</p>}
+              <CompletedToggle count={done.length} showDone={showDone} onToggleDone={onToggleDone} />
+              {showDone && (
+                <div className="done-list">
+                  <Layout spec={spec} list={done} showCategory={showCategory} onJump={onJumpToMessage} />
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
     </div>
   );
