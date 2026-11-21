@@ -27,10 +27,10 @@ function weekStart(ts: number) {
   return d;
 }
 
-/** Splits entries into labeled sections according to the spec's groupBy. */
-function group(spec: TemplateSpec, list: Entry[]): { key: string; label: string; entries: Entry[] }[] {
+/** Splits entries into labeled sections. */
+function group(by: TemplateSpec["groupBy"], list: Entry[]): { key: string; label: string; entries: Entry[] }[] {
   const at = (e: Entry) => e.message.created_at;
-  switch (spec.groupBy) {
+  switch (by) {
     case "none":
       return [{ key: "all", label: "", entries: list }];
     case "day":
@@ -55,12 +55,10 @@ function group(spec: TemplateSpec, list: Entry[]): { key: string; label: string;
       return CATEGORIES.map((c) => ({ key: c.id, label: `${c.emoji} ${c.label}`, entries: list.filter((e) => e.category === c.id) })).filter(
         (g) => g.entries.length,
       );
-    case "topic": {
-      if (!list.some((e) => e.topic)) return [{ key: "all", label: "", entries: list }];
+    case "topic":
       return groupBy(list, (e) => e.topic ?? "")
         .sort(([a, x], [b, y]) => (a === "" ? 1 : b === "" ? -1 : y.length - x.length))
         .map(([key, entries]) => ({ key: key || "other", label: key || "Other", entries }));
-    }
   }
 }
 
@@ -73,8 +71,13 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
     .filter((e) => spec.include.length === 0 || spec.include.includes(e.category as never))
     .filter((e) => !(spec.hideDone && e.done))
     .sort((a, b) => (spec.sort === "newest" ? -1 : 1) * (a.message.created_at - b.message.created_at));
-  const groups = group(spec, entries);
-  const showCategory = spec.include.length !== 1 && spec.groupBy !== "category";
+  // Topics are only added when Claude organizes the entries. With none, a topic template groups by category instead,
+  // or stays one plain list when everything is in the same category.
+  const noTopics = spec.groupBy === "topic" && !entries.some((e) => e.topic);
+  const oneCategory = new Set(entries.map((e) => e.category)).size <= 1;
+  const by = noTopics ? (oneCategory ? "none" : "category") : spec.groupBy;
+  const groups = group(by, entries);
+  const showCategory = spec.include.length !== 1 && by !== "category";
 
   return (
     <div className={`tpl font-${spec.style.font} accent-${spec.style.accent} density-${spec.style.density}`}>
@@ -101,9 +104,6 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
           )}
         </div>
         {spec.note && <p className="tpl-note">{spec.note}</p>}
-        {spec.groupBy === "topic" && entries.length > 0 && !entries.some((e) => e.topic) && (
-          <p className="tpl-note">These entries don't have topics yet, so they're shown together. Topics are added when Claude organizes your entries.</p>
-        )}
       </header>
 
       {entries.length === 0 ? (
