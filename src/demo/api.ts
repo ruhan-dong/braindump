@@ -29,9 +29,12 @@ export const api = {
       callback("demo");
       return () => {};
     },
-    justConfirmed: () => false,
+    signInNote: () => null,
+    resetPending: () => false,
     signIn: notInDemo,
     signUp: notInDemo,
+    requestReset: notInDemo,
+    resetPassword: notInDemo,
     signOut: notInDemo,
     forget: notInDemo,
   },
