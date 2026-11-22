@@ -8,7 +8,7 @@ Dump anything into a chat (text, links, images, video, files, voice). It gets tu
 
 The chat log is the source of truth: the organizer never rewrites your messages. It only adds "items" derived from them, and you can re-run it on any message.
 
-Each person signs up with an email and password and sees only their own log, templates, photo library and files.
+Each person signs up with an email and password and sees only their own log, templates, photo library and files. A forgotten password is reset through a link sent by email.
 
 ## Run
 
@@ -16,7 +16,10 @@ BrainDump keeps accounts, data and uploaded files in a Supabase project, so you 
 
 1. Create a project at supabase.com.
 2. In its dashboard, under Authentication > URL Configuration, set **Site URL** to `http://localhost:5173`, so the link in the confirmation email comes back to the app.
-3. Run the commands below. After copying `.env`, fill in its four Supabase values before going on; the file says where to find each one in the dashboard.
+3. In the dashboard's Authentication email templates, replace the link in two of them, so the emails link straight to the app. With Supabase's own links, the confirmation link only signs people in from the browser they signed up in, and the reset link never asks for a new password.
+   - **Confirm signup**: `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">Confirm email address</a>`
+   - **Reset password**: `<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a>`
+4. Run the commands below. After copying `.env`, fill in its four Supabase values before going on; the file says where to find each one in the dashboard.
 
 ```bash
 npm install
