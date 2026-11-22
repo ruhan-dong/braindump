@@ -51,6 +51,21 @@ async function photoMessage(userId: string, photo: db.Photo): Promise<db.Message
 }
 
 // ---------- Organizing pipeline ----------
+/** Fetches a link's preview and puts its picture in the user's own files, so the link keeps showing it whatever the
+ *  site does later. A picture that can't be stored is left out: the link is saved without one. */
+async function savePreview(userId: string, url: string): Promise<Omit<db.Link, "id">> {
+  const { picture, ...link } = await fetchPreview(url);
+  if (!picture) return { ...link, image: null };
+  const name = `${db.newId()}.${picture.mime.split("/")[1]}`;
+  try {
+    await putFile(userId, "uploads", name, picture.body, picture.mime);
+    return { ...link, image: `/uploads/${name}` };
+  } catch (err) {
+    console.error(`[organize] picture of ${url}:`, err);
+    return { ...link, image: null };
+  }
+}
+
 /** Runs in the background after a message is saved. Never rejects: a failure is recorded on the message. */
 async function organize(userId: string, id: string) {
   try {
@@ -81,8 +96,20 @@ async function organize(userId: string, id: string) {
           await pushMessage(userId, saved.id);
         }
       } else {
-        await db.replaceLinks(userId, id, await Promise.all(extractUrls(msg.text).map(fetchPreview)));
-        await pushMessage(userId, id); // show link previews as soon as they're ready
+        // A preview is fetched once, when the message is sent. Sorting the message again keeps what was saved then:
+        // the page may have changed or gone since.
+        const urls = extractUrls(msg.text);
+        if (urls.join("\n") !== msg.links.map((l) => l.url).join("\n")) {
+          const links = await Promise.all(urls.map((url) => savePreview(userId, url)));
+          try {
+            await removeFiles(userId, "uploads", await db.replaceLinks(userId, id, links));
+          } catch (err) {
+            // The links were not saved (the message was deleted meanwhile, say): don't leave their pictures behind.
+            await removeFiles(userId, "uploads", links.flatMap((l) => (l.image ? [path.basename(l.image)] : [])));
+            throw err;
+          }
+          await pushMessage(userId, id); // show link previews as soon as they're ready
+        }
         await db.replaceItems(userId, id, await classify(userId, (await db.getMessage(userId, id))!));
       }
       await db.setStatus(userId, id, "done");
