@@ -19,7 +19,7 @@ export const CATEGORIES = [
       "whimsey", "conceive of", "ideate", "envisage", "contrive", "devise", "formulate", "suggest",
     ],
   },
-  { id: "link", label: "Saved", unit: ["saved link", "saved links"], emoji: "🔖", hint: "a website, article, tool, or video link saved for later",
+  { id: "link", label: "Saved", unit: ["saved item", "saved items"], emoji: "🔖", hint: "a website, article, tool, or video link saved for later. Also something to read or watch later that has no link and no time on it ('Read Atomic Habits', 'Watch Dune 2'); with a time, a deadline, or a stated intention ('read Atomic Habits tonight', 'I need to read it') it is a todo instead",
     keywords: [
       "article", "website", "tutorial", "podcast", "blog", "newsletter", "bookmark", "resource", "tool", "video",
       "paper", "read", "watch", "web site", "internet site", "site", "web log", "newssheet", "video recording",

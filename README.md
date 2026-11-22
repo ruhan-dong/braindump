@@ -3,7 +3,7 @@
 Dump anything into a chat (text, links, images, video, files, voice). It gets turned into a document automatically, in one of two built-in templates, or in templates you describe yourself:
 
 - **📔 Journal:** one magazine-style spread per day: a cover illustration, a serif date headline, then sections instead of a timeline (notes with a drop cap, a to-do checklist, a photo grid, ideas as pull quotes, further reading, voice memos). Wide and narrow sections alternate left and right across a 12-column grid (`arrange()` in `JournalView.tsx`).
-- **🗂️ Organized:** a Notion-style page with everything regrouped by intent (to-dos, ideas, saved links, inspiration, moments, notes, files), then by topic.
+- **🗂️ Organized:** a Notion-style page with everything regrouped by intent (to-dos, ideas, saved items, inspiration, moments, notes, files), then by topic.
 - **＋ Custom templates:** describe a page in words ("a weekly review of my ideas and notes, in a serif magazine style") and it becomes a new tab. Claude turns the prompt into a template spec (`shared/templates.ts`): which categories to show, grouping (day / week / month / category / topic), layout (list / cards / gallery / checklist / timeline), sort order, and style (font, accent color, density). The app renders your entries with that spec, so a template can't produce a broken page. Without an API key, a keyword matcher builds the spec instead. Templates can be edited (re-prompted) or deleted from their page.
 
 The chat log is the source of truth: the organizer never rewrites your messages. It only adds "items" derived from them, and you can re-run it on any message.
