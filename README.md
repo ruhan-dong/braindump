@@ -65,9 +65,9 @@ To have Railway run it instead, add `npm run db:migrate` as a pre-deploy step un
 | Sign-in page and the browser side of the session | `src/components/AuthGate.tsx`, `src/auth.ts` |
 | Postgres queries, each limited to the signed-in user: `messages` → `attachments`, `links`, `items` | `server/db.ts` |
 | Tables and the storage bucket, applied by `npm run db:migrate` | `supabase/migrations/`, `server/migrate.ts` |
-| Uploaded files and thumbnails, in a private bucket | `server/storage.ts` |
+| Uploaded files, link preview pictures and thumbnails, in a private bucket | `server/storage.ts` |
 | Sample data: import into an account, and the source of the demo page | `server/seed.ts` |
-| Link previews (Open Graph) | `server/links.ts` |
+| Link previews (Open Graph), and the download of their pictures | `server/links.ts` |
 | Categorizer: Claude with structured output, plus the rule fallback | `server/classify.ts` |
 | Category list (shared by server and UI) | `shared/categories.ts` |
 | Rule-based categorizer: splits a message into one item per intent | `shared/rules.ts` |
@@ -78,6 +78,8 @@ To have Railway run it instead, add `npm run db:migrate` as a pre-deploy step un
 
 Pipeline per message: save the raw message and files → fetch link previews → classify into items (one message can produce several items, e.g. two to-dos and a link) → push the update to the browser.
 
+A link's preview is fetched once, when the message is sent: the page's title, description and site name, and its picture (`og:image` or `twitter:image`, or the link itself when it points straight at a picture). The picture is downloaded by the server and kept with the person's own files, so a saved link keeps showing it even if the site later changes it, removes it, or refuses to serve it to other sites, and the site never sees who looks at the link afterwards. Only JPEG, PNG, GIF, WebP and AVIF pictures up to 5 MB are kept; anything else, or a download that fails, saves the link without a picture. Both the page and the picture are fetched from the public internet only, never from the server's own machine or network. Sorting a message again ("Recategorize with AI") keeps the saved preview instead of fetching a new one. Links saved before pictures were kept still load theirs from the other site.
+
 Voice memos are recorded in the browser. While recording, the browser's Web Speech API (Chrome, Edge, Safari) produces a transcript, and that transcript is what gets categorized.
 
-Data lives in the Supabase project: rows in Postgres, and files in the private `media` bucket under each user's id. Row level security is on with no policies and the bucket has none either, so neither can be read from a browser. Everything goes through this server, which checks the session first. A file's address (`/uploads/<name>`) only works for its owner: the server redirects them to a link for that one file that expires in an hour.
+Data lives in the Supabase project: rows in Postgres, and files in the private `media` bucket under each user's id. Row level security is on with no policies and the bucket has none either, so neither can be read from a browser. Everything goes through this server, which checks the session first. A file's address (`/uploads/<name>`, for an attachment or a link's picture) only works for its owner: the server redirects them to a link for that one file that expires in an hour.

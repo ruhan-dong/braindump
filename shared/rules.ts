@@ -199,7 +199,7 @@ export function classifyWithRules(msg: Message): NewItem[] {
     } else items.push({ ...ref, category: "file", title: a.filename, body: caption });
   }
   for (const l of msg.links) {
-    const isImage = l.image === l.url;
+    const isImage = l.image !== null && l.title === null; // a link straight to a picture: saved with the picture and no title
     const body = linkCaption.get(l.url) || (msg.attachments.length === 0 ? caption : "");
     items.push({ ...base, link_id: l.id, category: isImage ? "inspiration" : "link", title: l.title ?? l.site_name ?? l.url, body });
   }

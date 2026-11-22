@@ -149,11 +149,18 @@ export async function insertMessage(
   return (await getMessage(userId, id))!;
 }
 
-export async function replaceLinks(userId: string, messageId: string, links: Omit<Link, "id">[]) {
+/** The stored names of the pictures kept for links. A link's picture is saved in the user's files and `image` is its
+ *  address there (/uploads/<name>). A link from before pictures were kept holds the other site's address, and has no file. */
+const storedPictures = (links: Row[]): string[] =>
+  links.flatMap((l) => (l.image?.startsWith("/uploads/") ? [l.image.slice("/uploads/".length)] : []));
+
+/** Returns the pictures of the links it replaced, so they can be deleted. */
+export async function replaceLinks(userId: string, messageId: string, links: Omit<Link, "id">[]): Promise<string[]> {
   const rows = links.map((l, position) => ({ id: newId(), user_id: userId, message_id: messageId, position, ...l }));
-  await sql.begin(async (tx) => {
-    await tx`DELETE FROM links WHERE user_id = ${userId} AND message_id = ${messageId}`;
+  return sql.begin(async (tx) => {
+    const replaced = await tx`DELETE FROM links WHERE user_id = ${userId} AND message_id = ${messageId} RETURNING image`;
     if (rows.length) await tx`INSERT INTO links ${tx(rows, "id", "user_id", "message_id", "position", "url", "title", "description", "image", "site_name")}`;
+    return storedPictures(replaced);
   });
 }
 
@@ -179,11 +186,12 @@ export async function updateItem(userId: string, id: string, patch: { done?: boo
   return row?.message_id ?? null;
 }
 
-/** Deletes a message and everything derived from it. Returns its uploaded files so they can be deleted too. */
+/** Deletes a message and everything derived from it. Returns its uploaded files and the pictures of its links so they can be deleted too. */
 export async function deleteMessage(userId: string, id: string): Promise<string[]> {
   const files = await sql`SELECT stored_name FROM attachments WHERE user_id = ${userId} AND message_id = ${id}`;
+  const links = await sql`SELECT image FROM links WHERE user_id = ${userId} AND message_id = ${id}`;
   await sql`DELETE FROM messages WHERE user_id = ${userId} AND id = ${id}`;
-  return files.map((r) => r.stored_name);
+  return [...files.map((r) => r.stored_name), ...storedPictures(links)];
 }
 
 /** Messages of any user that were mid-organize when the server last stopped. */

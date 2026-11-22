@@ -1,4 +1,4 @@
-// Uploaded files and photo thumbnails, kept in a private Supabase Storage bucket (see supabase/migrations/0002_storage.sql).
+// Uploaded files, link preview pictures and photo thumbnails, kept in a private Supabase Storage bucket (see supabase/migrations/0002_storage.sql).
 // Every function takes the user's id first and only reaches files under that id, so one user can never be handed
 // another's file, even with its exact name.
 import { createClient } from "@supabase/supabase-js";
@@ -9,7 +9,7 @@ if (!url || !secret) throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY are n
 
 const bucket = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } }).storage.from("media");
 
-/** uploads: files attached to messages. thumbs: thumbnails of the photo library. */
+/** uploads: files attached to messages, and the pictures of their link previews. thumbs: thumbnails of the photo library. */
 export type Folder = "uploads" | "thumbs";
 
 const keyOf = (userId: string, folder: Folder, name: string) => `${userId}/${folder}/${name}`;

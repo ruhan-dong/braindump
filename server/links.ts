@@ -59,12 +59,18 @@ const publicLookup: net.LookupFunction = (hostname, options, callback) => {
 
 const MAX_REDIRECTS = 5;
 const MAX_HTML_BYTES = 300_000;
+export const MAX_PICTURE_BYTES = 5 * 1024 * 1024;
+// Types a browser shows as a picture. SVG is left out: it can carry scripts.
+const PICTURE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/avif"]);
 
-const request = (url: URL, signal: AbortSignal) =>
+const PAGE_HEADERS = { accept: "text/html,*/*", "accept-encoding": "gzip, br" };
+const PICTURE_HEADERS = { accept: "image/*" };
+
+const request = (url: URL, signal: AbortSignal, headers: Record<string, string>) =>
   new Promise<http.IncomingMessage>((resolve, reject) => {
     const req = (url.protocol === "https:" ? https : http).request(
       url,
-      { lookup: publicLookup, signal, headers: { "user-agent": "Mozilla/5.0 (compatible; BrainDumpBot/0.1)", accept: "text/html,*/*", "accept-encoding": "gzip, br" } },
+      { lookup: publicLookup, signal, headers: { "user-agent": "Mozilla/5.0 (compatible; BrainDumpBot/0.1)", ...headers } },
       resolve,
     );
     req.on("error", reject);
@@ -90,8 +96,31 @@ async function readText(res: http.IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-/** Fetches a page from the public internet only. Throws for anything else. html is empty unless the page is HTML. */
-async function fetchPublic(start: string): Promise<{ url: string; type: string; html: string }> {
+/** A picture as it was downloaded. */
+export type Picture = { body: Buffer; mime: string };
+
+/** A response as a picture. Null if it is not one, or is larger than MAX_PICTURE_BYTES. */
+export async function readPicture(res: http.IncomingMessage): Promise<Picture | null> {
+  try {
+    const mime = (res.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    if (res.statusCode !== 200 || !PICTURE_TYPES.has(mime)) return null;
+    if (Number(res.headers["content-length"]) > MAX_PICTURE_BYTES) return null;
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of res) {
+      size += chunk.length;
+      if (size > MAX_PICTURE_BYTES) return null; // the size a server announces is not always the size it sends
+      chunks.push(chunk);
+    }
+    return { body: Buffer.concat(chunks), mime };
+  } finally {
+    res.destroy();
+  }
+}
+
+/** Opens an address on the public internet only, following redirects. Throws for anything else. The caller reads the
+ *  response or destroys it; either way the whole exchange is cut off after 6 seconds. */
+async function openPublic(start: string, headers: Record<string, string>): Promise<{ url: string; res: http.IncomingMessage }> {
   const signal = AbortSignal.timeout(6000);
   let url = new URL(start);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -100,21 +129,26 @@ async function fetchPublic(start: string): Promise<{ url: string; type: string; 
     const host = url.hostname.replace(/^\[|\]$/g, "");
     if (net.isIP(host) && isPrivateAddress(host)) throw new Error(`${host} is not a public address`);
 
-    const res = await request(url, signal);
+    const res = await request(url, signal, headers);
     const status = res.statusCode ?? 0;
     if (status >= 300 && status < 400 && res.headers.location) {
       res.destroy();
       url = new URL(res.headers.location, url);
       continue;
     }
-    const type = res.headers["content-type"] ?? "";
-    if (!type.includes("html")) {
-      res.destroy();
-      return { url: url.href, type, html: "" };
-    }
-    return { url: url.href, type, html: await readText(res) };
+    return { url: url.href, res };
   }
   throw new Error("Too many redirects");
+}
+
+/** Downloads a picture, from the public internet only. Null if there is none to be had: the address can't be reached
+ *  or is not public, or what it serves is not a picture or is too large. */
+export async function fetchPicture(url: string, base?: string): Promise<Picture | null> {
+  try {
+    return await readPicture((await openPublic(new URL(url, base).href, PICTURE_HEADERS)).res);
+  } catch {
+    return null;
+  }
 }
 
 function meta(html: string, key: string): string | null {
@@ -135,20 +169,28 @@ function decode(s: string | null) {
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)));
 }
 
-export async function fetchPreview(url: string): Promise<Omit<Link, "id">> {
-  const fallback = { url, title: null, description: null, image: null, site_name: new URL(url).hostname.replace(/^www\./, "") };
+/** What a page says about itself, and its picture. The picture is downloaded here, once, so the link keeps it
+ *  whatever the site does later. */
+export type Preview = Omit<Link, "id" | "image"> & { picture: Picture | null };
+
+export async function fetchPreview(url: string): Promise<Preview> {
+  const fallback = { url, title: null, description: null, picture: null, site_name: new URL(url).hostname.replace(/^www\./, "") };
   try {
-    const { url: finalUrl, type, html } = await fetchPublic(url);
-    if (type.startsWith("image/")) return { ...fallback, image: url };
-    if (!type.includes("html")) return fallback;
+    const { url: finalUrl, res } = await openPublic(url, PAGE_HEADERS);
+    const type = res.headers["content-type"] ?? "";
+    if (!type.includes("html")) {
+      res.destroy();
+      // A link straight to a picture: the picture is its preview.
+      return type.startsWith("image/") ? { ...fallback, picture: await fetchPicture(finalUrl) } : fallback;
+    }
+    const html = await readText(res);
     const title = meta(html, "og:title") ?? decode(/<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.trim() || null);
-    let image = meta(html, "og:image") ?? meta(html, "twitter:image");
-    if (image) image = new URL(image, finalUrl).toString();
+    const image = meta(html, "og:image") ?? meta(html, "twitter:image");
     return {
       url,
       title,
       description: meta(html, "og:description") ?? meta(html, "description"),
-      image,
+      picture: image ? await fetchPicture(image, finalUrl) : null,
       site_name: meta(html, "og:site_name") ?? fallback.site_name,
     };
   } catch {
