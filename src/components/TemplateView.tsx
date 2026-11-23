@@ -103,7 +103,10 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
           <span className="tpl-prompt" title="The prompt this template was made from">
             “{template.prompt}”
           </span>
-          <button onClick={onEdit}>Edit prompt</button>
+          {/* With an empty log every page is showing examples, and a template can't be changed or deleted yet. */}
+          <button onClick={onEdit} disabled={messages.length === 0}>
+            Edit prompt
+          </button>
           {confirmDelete ? (
             <>
               <button className="danger" onClick={onDelete}>
@@ -112,7 +115,9 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
               <button onClick={() => setConfirmDelete(false)}>Keep</button>
             </>
           ) : (
-            <button onClick={() => setConfirmDelete(true)}>Delete</button>
+            <button onClick={() => setConfirmDelete(true)} disabled={messages.length === 0}>
+              Delete
+            </button>
           )}
         </div>
         {spec.note && <p className="tpl-note">{spec.note}</p>}

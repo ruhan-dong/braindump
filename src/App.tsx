@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type Message, type Template } from "./api.ts";
 import { Chat } from "./components/Chat.tsx";
 import { JournalView } from "./components/JournalView.tsx";
 import { OrganizedView } from "./components/OrganizedView.tsx";
 import { TemplateView } from "./components/TemplateView.tsx";
-import { TemplateDialog } from "./components/TemplateDialog.tsx";
+import { DeleteTemplateDialog, TemplateDialog } from "./components/TemplateDialog.tsx";
 import { sampleMessages } from "./samples.ts";
 
 /** "journal", "organized", or the id of a custom template. */
@@ -56,6 +56,10 @@ export default function App({ email }: { email: string }) {
   const [showDone, setShowDone] = useState(savedShowDone);
   const [pane, setPane] = useState<"chat" | "doc">("chat"); // which pane is visible
   const [dialog, setDialog] = useState<{ editing?: Template } | null>(null);
+  const [deleting, setDeleting] = useState<Template | null>(null); // the template whose × was clicked, until confirmed or kept
+  const tabsRef = useRef<HTMLDivElement>(null);
+  // Whether tabs are scrolled out of sight on each side. That side of the row fades out to show there is more.
+  const [more, setMore] = useState({ left: false, right: false });
 
   useEffect(() => {
     api.status().then((s) => setAi(s.ai));
@@ -109,6 +113,26 @@ export default function App({ email }: { email: string }) {
 
   const toggleDone = useCallback(() => setShowDone((s) => !s), []);
 
+  const measureTabs = useCallback(() => {
+    const el = tabsRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+  }, []);
+
+  useEffect(() => {
+    const row = new ResizeObserver(measureTabs);
+    row.observe(tabsRef.current!);
+    return () => row.disconnect();
+  }, [measureTabs]);
+
+  // The open tab is brought into sight: it can be off to one side when the page loads, or after a template is added.
+  useEffect(() => {
+    tabsRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    measureTabs();
+  }, [activeView, templates, measureTabs]);
+
   const jumpToMessage = useCallback((messageId: string) => {
     setPane("chat");
     flash(`msg-${messageId}`);
@@ -125,7 +149,8 @@ export default function App({ email }: { email: string }) {
   async function deleteTemplate(id: string) {
     await api.templates.remove(id);
     setTemplates((list) => (list ?? []).filter((t) => t.id !== id));
-    setView("journal");
+    // A tab's × deletes a template without opening it, so the open page only changes when it is the one deleted.
+    setView((v) => (v === id ? "journal" : v));
   }
 
   // Shown at the top right of whichever pane is open.
@@ -135,10 +160,20 @@ export default function App({ email }: { email: string }) {
     </button>
   );
 
-  const tab = (id: View, label: string) => (
-    <button key={id} role="tab" aria-selected={activeView === id} className={activeView === id ? "on" : ""} onClick={() => setView(id)}>
-      {label}
-    </button>
+  // A template's tab gets an × to delete it, shown on hover. Not with an empty log, where templates can't be deleted yet.
+  const tab = (id: View, label: string, template?: Template) => (
+    <span key={id} className="tab-item" role="presentation">
+      <button role="tab" aria-selected={activeView === id} className={activeView === id ? "on" : ""} onClick={() => setView(id)}>
+        {label}
+      </button>
+      {template && messages.length > 0 && (
+        <button className="tab-close" onClick={() => setDeleting(template)} title="Delete template" aria-label={`Delete ${template.spec.name}`}>
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      )}
+    </span>
   );
 
   return (
@@ -147,14 +182,27 @@ export default function App({ email }: { email: string }) {
 
       <main className="doc">
         <div className="doc-bar">
-          <div className="tabs" role="tablist">
-            {tab("journal", "📔 Journal")}
-            {tab("organized", "🗂️ Organized")}
-            {templates?.map((t) => tab(t.id, `${t.spec.emoji} ${t.spec.name}`))}
-            <button className="tab-add" onClick={() => setDialog({})} title="New template from a prompt" aria-label="New template">
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <div className="tab-bar">
+            <div
+              className={`tabs${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`}
+              role="tablist"
+              ref={tabsRef}
+              onScroll={measureTabs}
+              // A mouse wheel only turns up and down, so that moves the row sideways too.
+              onWheel={(e) => {
+                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
+              }}
+            >
+              {tab("journal", "📔 Journal")}
+              {tab("organized", "🗂️ Organized")}
+              {templates?.map((t) => tab(t.id, `${t.spec.emoji} ${t.spec.name}`, t))}
+            </div>
+            {/* Outside the row that scrolls, so it stays in sight however many tabs there are. */}
+            <button className="tab-add" onClick={() => setDialog({})} title="Create Your Template" aria-label="Create Your Template">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
                 <path d="M8 3v10M3 8h10" />
               </svg>
+              <span>Create Your Template</span>
             </button>
           </div>
           {account}
@@ -206,6 +254,7 @@ export default function App({ email }: { email: string }) {
           onClose={() => setDialog(null)}
         />
       )}
+      {deleting && <DeleteTemplateDialog name={deleting.spec.name} onDelete={() => deleteTemplate(deleting.id).then(() => setDeleting(null))} onClose={() => setDeleting(null)} />}
     </div>
   );
 }
