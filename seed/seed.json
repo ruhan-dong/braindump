@@ -944,7 +944,7 @@
       "id": "4dc0cd76-e5e6-4c8e-8083-d33f5e2eb34b",
       "created_at": 1792780047042,
       "prompt": "Open to-dos grouped by topic, as a green checklist",
-      "spec": "{\"name\":\"Open to-dos\",\"emoji\":\"☑️\",\"title\":\"Open to-dos grouped by topic\",\"subtitle\":\"\",\"include\":[\"todo\"],\"groupBy\":\"topic\",\"sort\":\"newest\",\"layout\":\"checklist\",\"hideDone\":true,\"showTime\":true,\"style\":{\"font\":\"sans\",\"accent\":\"green\",\"density\":\"comfortable\"},\"note\":\"\"}"
+      "spec": "{\"name\":\"Open to-dos\",\"emoji\":\"☑️\",\"title\":\"Open to-dos\",\"subtitle\":\"\",\"include\":[\"todo\"],\"groupBy\":\"topic\",\"sort\":\"newest\",\"layout\":\"checklist\",\"hideDone\":true,\"showTime\":true,\"style\":{\"font\":\"sans\",\"accent\":\"green\",\"density\":\"comfortable\"},\"note\":\"\"}"
     }
   ]
 }
