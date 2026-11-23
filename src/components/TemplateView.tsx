@@ -7,6 +7,7 @@ import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts"
 import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 import { ExampleNote } from "./JournalView.tsx";
+import { COVERS } from "../covers.ts";
 import { exampleProps, isExample, sampleMessages } from "../samples.ts";
 import { CompletedToggle, type DoneToggle } from "./OrganizedView.tsx";
 
@@ -70,8 +71,11 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
 
   const fits = (e: Entry) => spec.include.length === 0 || spec.include.includes(e.category as never);
   const own = messages.flatMap(toEntries).filter(fits);
-  // With nothing of the person's own to show, the page is filled with the faded examples that fit it instead of being left blank.
-  const examples = own.length ? [] : sampleMessages().flatMap(toEntries).filter(fits);
+  // With an empty log, the page is filled with the faded examples that fit it instead of being left blank.
+  const examples = messages.length ? [] : sampleMessages().flatMap(toEntries).filter(fits);
+  // The earlier rule, kept to go back to: a template keeps its examples until something of the person's own fits it,
+  // which can be after the Log has lost its own. Going back also means the earlier `until` on the ExampleNote below.
+  // const examples = own.length ? [] : sampleMessages().flatMap(toEntries).filter(fits);
   const sample = examples.length > 0;
   const all = (sample ? examples : own).sort((a, b) => (spec.sort === "newest" ? -1 : 1) * (a.message.created_at - b.message.created_at));
   // A template that leaves out completed to-dos lists them at the end instead, under "Completed", the way Organized does.
@@ -87,7 +91,8 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
 
   return (
     <div className={`tpl font-${spec.style.font} accent-${spec.style.accent} density-${spec.style.density}`}>
-      {sample && <ExampleNote until="something in your Log fits this template" jumps={messages.length === 0} />}
+      {/* Under the earlier rule: until="something in your Log fits this template" */}
+      {sample && <ExampleNote until="you send your first message in the Log" jumps={messages.length === 0} />}
       <header className="tpl-head">
         <span className="page-icon tpl-icon" aria-hidden="true">
           {spec.emoji}
@@ -113,9 +118,13 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
         {spec.note && <p className="tpl-note">{spec.note}</p>}
       </header>
 
-      {/* No example fits either, such as a page of moments only. */}
-      {all.length === 0 && <p className="page-note">Nothing matches this template yet. Edit the prompt to include more, or add entries in the Log.</p>}
-      {/* A template keeps its examples until something fits it, which can be after the Log has lost its own. */}
+      {/* Nothing in the log fits, or with an empty log no example does, such as a page of moments only. */}
+      {all.length === 0 && (
+        <div className="empty">
+          <img src={COVERS.moon} alt="" />
+          <p>Nothing matches this template yet</p>
+        </div>
+      )}
       <div {...exampleProps(sample, messages.length === 0)}>
         {entries.length > 0 &&
           groups.map((g) => (

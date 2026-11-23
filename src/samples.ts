@@ -1,8 +1,8 @@
 // Example messages for an account with nothing in it yet, so the Log and the Notebook show how the app works
 // instead of being blank. It is one set, three days of it: the Log shows the messages, and every Notebook page shows
 // the entries they were sorted into, so each message can be found on the pages and each entry back in the Log.
-// They are drawn like real ones, faded (.sample in styles.css), and are never saved: a page stops asking for them
-// once the person has something of their own for it.
+// They are drawn like real ones, faded (.sample in styles.css), and are never saved: the Log and every page stop
+// showing them once the first message is sent.
 import type { MouseEvent } from "react";
 import type { Attachment, Link, Message } from "./api.ts";
 import type { CategoryId } from "../shared/categories.ts";

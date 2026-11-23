@@ -208,8 +208,10 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 .drop-overlay { position: absolute; inset: 10px; border: 2px dashed var(--link); border-radius: 12px; background: rgba(35, 131, 226, 0.06); display: grid; place-items: center; font-size: 17px; color: var(--link); pointer-events: none; }
 
 /* ---------- Empty states ---------- */
-/* A line of explanation on a Notebook page, above its entries */
-.page-note { max-width: var(--page); margin: 28px auto 0; padding: 0 24px; color: var(--muted); }
+/* A template page with nothing to list: a picture and a short line under it, so the page isn't left bare */
+.empty { text-align: center; margin: 8vh auto 0; max-width: 360px; padding: 0 16px; }
+.empty img { width: 168px; height: 168px; object-fit: cover; border-radius: 12px; margin: 0 auto 18px; }
+.empty p { margin: 0; font-size: 14px; color: var(--muted); }
 /* Example messages and entries in an account with nothing of its own yet (src/samples.ts): drawn like real ones, faded, with a line saying so */
 .example-note { margin: 0; padding: 8px 16px; text-align: center; font-size: 13px; color: var(--ink-2); background: var(--bg-soft); text-wrap: balance; }
 /* On a Notebook page the banner is the first thing on it, and stays at the top as the page scrolls */
@@ -563,7 +565,7 @@ button.tag:hover, a.tag:hover { filter: brightness(0.96); }
 @media (max-width: 640px) {
   .doc-bar { padding: 0 16px; }
   .ai-badge { display: none; }
-  .issue-head, .spread, .org-head, .org-sec, .tpl-head, .tpl-group, .page-note { padding-left: 16px; padding-right: 16px; }
+  .issue-head, .spread, .org-head, .org-sec, .tpl-head, .tpl-group { padding-left: 16px; padding-right: 16px; }
   .tpl-row .tpl-meta-info, .tpl-check .tpl-meta-info { display: none; }
   .tpl-timeline li { grid-template-columns: 58px 1fr; gap: 12px; }
   .tpl-timeline li::before { left: 69px; }

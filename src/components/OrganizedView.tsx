@@ -26,11 +26,15 @@ type Jump = (id: string) => void;
 /** Intent template: everything regrouped by what the user meant (to-do, link, inspiration…), then by topic. */
 export function OrganizedView({ messages, onJumpToMessage, showDone, onToggleDone }: Props) {
   const own = messages.flatMap(toEntries);
-  // With nothing organized yet, the page is filled with faded examples instead of being left blank.
-  const sample = own.length === 0;
+  // With an empty log, the page is filled with faded examples instead of being left blank.
+  const sample = messages.length === 0;
+  // The earlier rule, kept to go back to: the examples stay until something is organized, so also while the first
+  // message is still being organized.
+  // const sample = own.length === 0;
   const shown = sample ? sampleMessages() : messages;
   const entries = sample ? shown.flatMap(toEntries) : own;
-  // A message still being organized is in the Log with no entry here yet: the Log then has no examples to jump to.
+  // Only matters under the earlier rule: a message still being organized is in the Log with no entry here yet, and
+  // the Log then has no examples to jump to.
   const faded = exampleProps(sample, messages.length === 0);
   const sections = CATEGORIES.map((c) => ({ ...c, list: entries.filter((e) => e.category === c.id) })).filter((s) => s.list.length);
 
