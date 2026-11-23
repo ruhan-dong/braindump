@@ -7,7 +7,7 @@ import template from "../assets/landing/new-template-dialog.png";
 const FEATURES = [
   {
     title: "Intuitive chat history as a log",
-    body: "Write the way you text. Thoughts, links, photos and voice notes land in one timestamped log.",
+    body: "Write the way you text. Thoughts, links, photos, files and voice notes land in one timestamped log.",
     shot: log,
     alt: "The BrainDump log: messages, an image and a link, each with a category tag and a time",
   },
