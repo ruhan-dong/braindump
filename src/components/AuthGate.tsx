@@ -96,12 +96,12 @@ function Login({ mode, onSwitch, onBack, onDone }: { mode: Mode; onSwitch: (mode
       } else if (mode === "up") {
         const result = await api.auth.signUp(email.trim(), password);
         setError(result.error);
-        if (result.confirm) setNote(`Almost there. Open the link we emailed to ${email.trim()}, then sign in.`);
+        if (result.confirm) setNote("Check your email for the confirmation link.");
       } else if (mode === "forgot") {
         const failed = await api.auth.requestReset(email.trim());
         setError(failed);
         // Said the same way whether or not the address has an account, so the form can't be used to find out.
-        if (!failed) setNote(`If ${email.trim()} has an account, a link to choose a new password is on its way.`);
+        if (!failed) setNote(`If ${email.trim()} has an account, a password reset link has been sent.`);
       } else {
         const failed = await api.auth.resetPassword(password);
         setError(failed);
