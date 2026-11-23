@@ -5,6 +5,7 @@ import { JournalView } from "./components/JournalView.tsx";
 import { OrganizedView } from "./components/OrganizedView.tsx";
 import { TemplateView } from "./components/TemplateView.tsx";
 import { TemplateDialog } from "./components/TemplateDialog.tsx";
+import { sampleMessages } from "./samples.ts";
 
 /** "journal", "organized", or the id of a custom template. */
 type View = string;
@@ -46,6 +47,9 @@ function flash(id: string) {
 
 export default function App({ email }: { email: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
+  // Whether the log has been fetched. Until then nothing is drawn, so an empty log (which gets example messages)
+  // can be told from one that hasn't arrived.
+  const [loaded, setLoaded] = useState(false);
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [ai, setAi] = useState<boolean | null>(null);
   const [view, setView] = useState<View>(savedView);
@@ -62,7 +66,11 @@ export default function App({ email }: { email: string }) {
         if (event.type === "message") setMessages((list) => upsert(list, event.message));
         if (event.type === "deleted") setMessages((list) => list.filter((m) => m.id !== event.id));
       },
-      () => api.list().then(setMessages),
+      () =>
+        api.list().then((list) => {
+          setMessages(list);
+          setLoaded(true);
+        }),
     );
   }, []);
 
@@ -91,7 +99,9 @@ export default function App({ email }: { email: string }) {
       setPane("doc");
       // Always shown in Organized, which lists every item. A completed to-do is only on the page while "Completed" is open.
       setView("organized");
-      if (messages.some((m) => m.items.some((i) => i.id === itemId && i.category === "todo" && i.done))) setShowDone(true);
+      // An empty log shows the example messages, and those can be jumped from too.
+      const log = messages.length ? messages : sampleMessages();
+      if (log.some((m) => m.items.some((i) => i.id === itemId && i.category === "todo" && i.done))) setShowDone(true);
       flash(`item-${itemId}`);
     },
     [messages],
@@ -133,7 +143,7 @@ export default function App({ email }: { email: string }) {
 
   return (
     <div className={`app pane-${pane}`}>
-      <Chat messages={messages} onJumpToItem={jumpToItem} account={account} />
+      <Chat messages={messages} loaded={loaded} onJumpToItem={jumpToItem} account={account} />
 
       <main className="doc">
         <div className="doc-bar">
@@ -150,7 +160,7 @@ export default function App({ email }: { email: string }) {
           {account}
         </div>
         <div className="doc-scroll">
-          {activeView === "journal" ? (
+          {!loaded ? null : activeView === "journal" ? (
             <JournalView messages={messages} onJumpToMessage={jumpToMessage} />
           ) : activeView === "organized" ? (
             <OrganizedView messages={messages} onJumpToMessage={jumpToMessage} showDone={showDone} onToggleDone={toggleDone} />

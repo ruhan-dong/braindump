@@ -3,7 +3,7 @@ import { api, type Message } from "../api.ts";
 import { CATEGORIES } from "../../shared/categories.ts";
 import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, hash, headline, toEntries, visualOf, type Entry } from "../doc.ts";
-import { COVERS } from "../covers.ts";
+import { exampleProps, isExample, sampleMessages } from "../samples.ts";
 import { FileChip, ImageLink, Linkified, VoiceNote } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
 
@@ -12,13 +12,17 @@ type Jump = (id: string) => void;
 
 /** Free-form template: one magazine spread per day, content grouped into sections rather than a timeline. */
 export function JournalView({ messages, onJumpToMessage }: Props) {
-  const days = groupBy(messages, (m) => dayKey(m.created_at)).reverse();
-  if (!days.length) return <EmptyDoc />;
+  // With an empty log, the page is filled with faded examples instead of being left blank.
+  const sample = messages.length === 0;
+  const days = groupBy(sample ? sampleMessages() : messages, (m) => dayKey(m.created_at)).reverse();
   return (
     <div className="journal">
-      {days.map(([key, msgs]) => (
-        <DayPage key={key} day={key} msgs={msgs} onJump={onJumpToMessage} />
-      ))}
+      {sample && <ExampleNote until="you send your first message in the Log" />}
+      <div {...exampleProps(sample)}>
+        {days.map(([key, msgs]) => (
+          <DayPage key={key} day={key} msgs={msgs} onJump={onJumpToMessage} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -138,7 +142,7 @@ function Todos({ list, onJump }: { list: Entry[]; onJump: Jump }) {
       {list.map((e) => (
         <li key={e.id} id={`item-${e.id}`} className={`j-item j-todo ${e.done ? "done" : ""}`}>
           <label>
-            <input type="checkbox" checked={e.done} onChange={() => api.patchItem(e.id, { done: !e.done })} />
+            <input type="checkbox" checked={e.done} disabled={isExample(e.id)} onChange={() => api.patchItem(e.id, { done: !e.done })} />
             <span className="j-todo-text">
               {e.attachment?.kind === "audio" && "🎙️ "}
               {headline(e)}
@@ -276,12 +280,15 @@ function Pending({ msgs }: { msgs: Message[] }) {
   );
 }
 
-export function EmptyDoc() {
+/**
+ * The banner on a Notebook page that is showing example entries (src/samples.ts) because the person has nothing of
+ * their own for it yet. It goes first on the page and stays at the top as the page scrolls, like the one above the
+ * box to type in in the Log. `jumps` is false where the arrow to an entry's message isn't offered (see exampleProps).
+ */
+export function ExampleNote({ until, jumps = true }: { until: string; jumps?: boolean }) {
   return (
-    <div className="empty">
-      <img src={COVERS.moon} alt="" />
-      <h2>Nothing here yet</h2>
-      <p>Send anything in the Log and it shows up here, laid out and sorted.</p>
-    </div>
+    <p className="example-note">
+      These are example entries.{jumps && " Click ↗ on one to see its message in the Log."} They go away once {until}.
+    </p>
   );
 }
