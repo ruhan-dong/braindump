@@ -28,6 +28,8 @@ const IDEA_RE =
   /\b(idea|what if|maybe we|could build|how about|wouldn'?t it be|brainstorm\w*|(?:we|i)(?:'re| are|'m| am) (?:building|creating|developing)|thinking (?:of|about) (?:building|making|creating|starting|launching))\b/i;
 // Openers that always start a new idea instead of continuing the previous one.
 const NEW_IDEA_RE = /^\s*(?:idea:|what if|how about)/i;
+// Something to read or watch with no time on it is saved for later: "Read Atomic Habits", "Watch Dune 2".
+const LATER_RE = /^(?:read|watch)\b/i;
 const INSPO_RE = /\b(inspo|inspiration|design|palette|colou?rs?|ui|ux|layout|fonts?|typography|moodboard|reference|style)\b/i;
 
 // Plans count as to-dos too: things with a time on them, intentions, and appointments.
@@ -115,7 +117,8 @@ function clauses(text: string): string[] {
   return out.map((c) => c.replace(CONNECTOR, "").replace(/[,;]\s*$/, "").trim()).filter((c) => c && !isFiller(c));
 }
 
-type Clause = { kind: "todo" | "idea" | "note" | "link"; text: string; urls: string[] };
+// "link" carries a URL; "later" is something to read or watch that has none, filed under Saved all the same.
+type Clause = { kind: "todo" | "idea" | "note" | "link" | "later"; text: string; urls: string[] };
 
 /**
  * Last resort for a clause none of the patterns above caught: whichever of to-do / idea / note keywords it mentions
@@ -142,7 +145,10 @@ function parse(text: string): Clause[] {
     if (/^\s*(?:idea:|what if)/i.test(stripMarker(c))) return { kind: "idea", text: c, urls: [] };
     if (isTask(c)) return { kind: "todo", text: c, urls: [] };
     if (IDEA_RE.test(c)) return { kind: "idea", text: c, urls: [] };
-    return { kind: byKeywords(c), text: c, urls: [] };
+    const kind = byKeywords(c);
+    // "Read a great book yesterday" looks back, so it stays a note.
+    const later = kind === "note" && LATER_RE.test(stripBullet(c)) && !PAST_RE.test(c);
+    return { kind: later ? "later" : kind, text: c, urls: [] };
   });
   // Neighbouring note clauses are one thought, and sentences after an idea keep elaborating it unless they open a
   // new one ("Idea: …", "What if …").
@@ -162,13 +168,14 @@ const base = { topic: null, attachment_id: null, link_id: null };
 function itemFor(c: Clause): NewItem {
   if (c.kind === "todo") return { ...base, category: "todo", title: short(todoTitle(c.text), 80), body: "" };
   const text = stripPrefix(stripMarker(c.text));
-  return { ...base, category: c.kind === "idea" ? "idea" : "note", title: short(text), body: text };
+  const category = c.kind === "idea" ? "idea" : c.kind === "later" ? "link" : "note";
+  return { ...base, category, title: short(text), body: text };
 }
 
 export function classifyWithRules(msg: Message): NewItem[] {
   const items: NewItem[] = [];
   const parsed = parse(msg.text);
-  const notes = parsed.filter((c) => c.kind === "note");
+  const notes = parsed.filter((c) => c.kind === "note" || c.kind === "later");
   const linkCaption = new Map(parsed.filter((c) => c.kind === "link").flatMap((c) => c.urls.map((u) => [u, c.text] as const)));
 
   // Plain notes describe the media they came with, so they become its caption instead of separate items:
@@ -204,7 +211,7 @@ export function classifyWithRules(msg: Message): NewItem[] {
     items.push({ ...base, link_id: l.id, category: isImage ? "inspiration" : "link", title: l.title ?? l.site_name ?? l.url, body });
   }
   for (const c of parsed) {
-    if (c.kind === "todo" || c.kind === "idea" || (c.kind === "note" && !notesAsCaption)) items.push(itemFor(c));
+    if (c.kind === "todo" || c.kind === "idea" || (c.kind !== "link" && !notesAsCaption)) items.push(itemFor(c));
   }
   return items;
 }

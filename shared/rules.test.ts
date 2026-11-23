@@ -38,6 +38,14 @@ const cases: [string, string[]][] = [
   ["Buy milk. Call mom tomorrow.", ["todo:Buy milk", "todo:Call mom tomorrow"]],
   ["Meeting with Rohan at 1", ["todo:Meeting with Rohan at 1"]],
   ["I need to send it by Friday", ["todo:Send it by Friday"]],
+  // Read or watch later: saved unless it has a time on it or looks back
+  ["Read Atomic Habits", ["link:Read Atomic Habits"]],
+  ["Watch Dune 2", ["link:Watch Dune 2"]],
+  ["- Read this article about design", ["link:Read this article about design"]],
+  ["Read Atomic Habits tonight", ["todo:Read Atomic Habits tonight"]],
+  ["I need to read Atomic Habits", ["todo:Read Atomic Habits"]],
+  ["I read a great book yesterday", ["note:I read a great book yesterday"]],
+  ["Read a great book yesterday", ["note:Read a great book yesterday"]],
   // Not to-dos
   ["I should have known better", ["note:I should have known better"]],
   ["That movie must be amazing", ["note:That movie must be amazing"]],

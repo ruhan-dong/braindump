@@ -14,7 +14,7 @@ const FEATURES = [
     title: "Auto-categorized notes",
     body: "Every note is automatically sorted into a category and laid out neatly, in the built-in pages and the templates you make. Click its label to move it somewhere else.",
     shot: organized,
-    alt: "The Organized page: everything sorted into to-dos, ideas, saved links and more",
+    alt: "The Organized page: everything sorted into to-dos, ideas, saved items and more",
   },
   {
     title: "Create your customized template",
