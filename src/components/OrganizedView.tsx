@@ -36,7 +36,11 @@ export function OrganizedView({ messages, onJumpToMessage, showDone, onToggleDon
   // Only matters under the earlier rule: a message still being organized is in the Log with no entry here yet, and
   // the Log then has no examples to jump to.
   const faded = exampleProps(sample, messages.length === 0);
-  const sections = CATEGORIES.map((c) => ({ ...c, list: entries.filter((e) => e.category === c.id) })).filter((s) => s.list.length);
+  const all = CATEGORIES.map((c) => ({ ...c, list: entries.filter((e) => e.category === c.id) }));
+  const sections = all.filter((s) => s.list.length);
+  // The user's own page lists every category at the top, with 0 on the ones that have nothing yet. The examples
+  // keep to the categories they fill.
+  const tags = sample ? sections : all;
 
   return (
     <div className="organized">
@@ -52,11 +56,18 @@ export function OrganizedView({ messages, onJumpToMessage, showDone, onToggleDon
             {entries.length} {entries.length === 1 ? "item" : "items"} · from {shown.length} {shown.length === 1 ? "message" : "messages"}
           </p>
           <nav className="org-toc" aria-label="Categories">
-            {sections.map((s) => (
-              <a key={s.id} href={`#sec-${s.id}`} className={`tag cat-${s.id}`}>
-                {s.emoji} {s.label} <b>{s.id === "todo" ? s.list.filter((e) => !e.done).length : s.list.length}</b>
-              </a>
-            ))}
+            {tags.map((s) =>
+              s.list.length ? (
+                <a key={s.id} href={`#sec-${s.id}`} className={`tag cat-${s.id}`}>
+                  {s.emoji} {s.label} <b>{s.id === "todo" ? s.list.filter((e) => !e.done).length : s.list.length}</b>
+                </a>
+              ) : (
+                // Nothing to jump to, so not a link.
+                <span key={s.id} className={`tag cat-${s.id}`}>
+                  {s.emoji} {s.label} <b>0</b>
+                </span>
+              ),
+            )}
           </nav>
         </div>
       </header>
