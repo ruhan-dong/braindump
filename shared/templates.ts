@@ -80,11 +80,12 @@ export function templateFromKeywords(prompt: string): TemplateSpec {
       : "sans";
   const accent = ACCENTS.find((c) => has(p, new RegExp(`\\b${c === "gray" ? "gr[ae]y" : c}\\b`))) ?? "gray";
 
-  // Title: the request minus filler ("make me a…") and minus how it should look (", in a serif style").
+  // Title: the request minus filler ("make me a…") and minus how it should look (", in a serif style") or be
+  // grouped ("grouped by topic"): a page only splits into groups when its entries give it something to split by.
   const what = prompt
     .replace(/^\s*(please\s+)?(make|create|build|give|show)(\s+me)?\s+/i, "")
     .replace(/^\s*(a|an|the|my)\s+/i, "")
-    .split(/,|\s+(?:in|as|with|using)\s+(?:a|an)\s+/i)[0]
+    .split(/,|\s+grouped\s+by\s+|\s+(?:in|as|with|using)\s+(?:a|an)\s+/i)[0]
     .replace(/[.!?]+$/, "")
     .trim();
   // Tab name: the head of that phrase, up to the first connecting word ("Weekly review of my…" → "Weekly review").
