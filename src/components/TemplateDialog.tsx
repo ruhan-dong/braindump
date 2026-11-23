@@ -69,9 +69,8 @@ export function TemplateDialog({ initialPrompt = "", editing, ai, onSubmit, onCl
             ))}
           </div>
         )}
-        <p className="dialog-mode">
-          {ai ? "Claude turns your description into a template." : "Without an API key, templates are made by matching keywords, so keep the description simple."}
-        </p>
+        {/* Hidden for now: put it back to bring it back.
+        {ai && <p className="dialog-mode">Claude turns your description into a template.</p>} */}
         {error && <p className="dialog-error">{error}</p>}
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
@@ -79,6 +78,52 @@ export function TemplateDialog({ initialPrompt = "", editing, ai, onSubmit, onCl
           </button>
           <button type="button" className="btn primary" onClick={submit} disabled={busy || !prompt.trim()}>
             {busy ? "Making template…" : editing ? "Update template" : "Create template"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Asks before a template is deleted from its tab, since it can't be brought back. */
+export function DeleteTemplateDialog({ name, onDelete, onClose }: { name: string; onDelete: () => Promise<void>; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onDelete();
+    } catch (e) {
+      console.error(e);
+      setError("Couldn't delete the template. Try again.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      {/* Kept quiet: small text only, and two plain buttons. */}
+      <div className="dialog dialog-confirm" role="dialog" aria-modal="true" aria-labelledby="tpl-delete-text">
+        <p className="dialog-lede" id="tpl-delete-text">
+          “{name}” will be deleted.
+          <br />
+          Everything in your Log stays.
+        </p>
+        {error && <p className="dialog-error">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="btn" onClick={submit} disabled={busy}>
+            {busy ? "Deleting…" : "Delete"}
           </button>
         </div>
       </div>

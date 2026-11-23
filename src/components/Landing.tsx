@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import log from "../assets/landing/log.png";
 import organized from "../assets/landing/organized.png";
-import template from "../assets/landing/template.png";
+// The earlier picture of this dialog is kept as template.png, to go back to.
+import template from "../assets/landing/new-template-dialog.png";
 
 const FEATURES = [
   {
