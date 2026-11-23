@@ -4,8 +4,9 @@ import { formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts";
 import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
-import { EmptyDoc } from "./JournalView.tsx";
+import { ExampleNote } from "./JournalView.tsx";
 import { COVERS } from "../covers.ts";
+import { exampleProps, isExample, sampleMessages } from "../samples.ts";
 
 /** Whether completed to-dos are listed, and the switch for it. Kept by the app so it is remembered and a jump can open it. */
 export type DoneToggle = { showDone: boolean; onToggleDone: () => void };
@@ -24,40 +25,50 @@ type Jump = (id: string) => void;
 
 /** Intent template: everything regrouped by what the user meant (to-do, link, inspiration…), then by topic. */
 export function OrganizedView({ messages, onJumpToMessage, showDone, onToggleDone }: Props) {
-  const entries = messages.flatMap(toEntries);
-  if (!entries.length) return <EmptyDoc />;
+  const own = messages.flatMap(toEntries);
+  // With nothing organized yet, the page is filled with faded examples instead of being left blank.
+  const sample = own.length === 0;
+  const shown = sample ? sampleMessages() : messages;
+  const entries = sample ? shown.flatMap(toEntries) : own;
+  // A message still being organized is in the Log with no entry here yet: the Log then has no examples to jump to.
+  const faded = exampleProps(sample, messages.length === 0);
   const sections = CATEGORIES.map((c) => ({ ...c, list: entries.filter((e) => e.category === c.id) })).filter((s) => s.list.length);
 
   return (
     <div className="organized">
+      {sample && <ExampleNote until="you send your first message in the Log" jumps={messages.length === 0} />}
       <figure className="cover">
         <img src={COVERS.fig} alt="" />
       </figure>
       <header className="org-head">
         <span className="page-icon" aria-hidden="true">🗂️</span>
         <h1>Everything, sorted</h1>
-        <p className="org-props">
-          {entries.length} {entries.length === 1 ? "item" : "items"} · from {messages.length} {messages.length === 1 ? "message" : "messages"}
-        </p>
-        <nav className="org-toc" aria-label="Categories">
-          {sections.map((s) => (
-            <a key={s.id} href={`#sec-${s.id}`} className={`tag cat-${s.id}`}>
-              {s.emoji} {s.label} <b>{s.id === "todo" ? s.list.filter((e) => !e.done).length : s.list.length}</b>
-            </a>
-          ))}
-        </nav>
+        <div {...faded}>
+          <p className="org-props">
+            {entries.length} {entries.length === 1 ? "item" : "items"} · from {shown.length} {shown.length === 1 ? "message" : "messages"}
+          </p>
+          <nav className="org-toc" aria-label="Categories">
+            {sections.map((s) => (
+              <a key={s.id} href={`#sec-${s.id}`} className={`tag cat-${s.id}`}>
+                {s.emoji} {s.label} <b>{s.id === "todo" ? s.list.filter((e) => !e.done).length : s.list.length}</b>
+              </a>
+            ))}
+          </nav>
+        </div>
       </header>
 
-      {sections.map((s) => (
-        <section key={s.id} id={`sec-${s.id}`} className={`org-sec cat-${s.id}`}>
-          <h2>
-            <span className="org-sec-emoji">{s.emoji}</span>
-            {s.label}
-            <span className="org-sec-count">{s.list.length}</span>
-          </h2>
-          {s.id === "todo" ? <TodoSection list={s.list} onJump={onJumpToMessage} showDone={showDone} onToggleDone={onToggleDone} /> : <Topics id={s.id} list={newestFirst(s.list)} onJump={onJumpToMessage} />}
-        </section>
-      ))}
+      <div {...faded}>
+        {sections.map((s) => (
+          <section key={s.id} id={`sec-${s.id}`} className={`org-sec cat-${s.id}`}>
+            <h2>
+              <span className="org-sec-emoji">{s.emoji}</span>
+              {s.label}
+              <span className="org-sec-count">{s.list.length}</span>
+            </h2>
+            {s.id === "todo" ? <TodoSection list={s.list} onJump={onJumpToMessage} showDone={showDone} onToggleDone={onToggleDone} /> : <Topics id={s.id} list={newestFirst(s.list)} onJump={onJumpToMessage} />}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -201,7 +212,7 @@ function TodoRow({ e, onJump }: { e: Entry; onJump: Jump }) {
   const body = extraBody(e);
   return (
     <li className={`org-item todo ${e.done ? "done" : ""}`} id={`item-${e.id}`}>
-      <input type="checkbox" checked={e.done} onChange={() => api.patchItem(e.id, { done: !e.done })} />
+      <input type="checkbox" checked={e.done} disabled={isExample(e.id)} onChange={() => api.patchItem(e.id, { done: !e.done })} />
       <div className="todo-main">
         <span className="todo-title">{headline(e)}</span>
         {body && <span className="todo-body">{body}</span>}

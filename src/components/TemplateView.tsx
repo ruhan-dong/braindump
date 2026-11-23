@@ -6,7 +6,8 @@ import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { extraBody, headline, toEntries, visualOf, type Entry } from "../doc.ts";
 import { AttachmentView, ImageLink, LinkCard } from "./Media.tsx";
 import { ItemActions } from "./ItemActions.tsx";
-import { EmptyDoc } from "./JournalView.tsx";
+import { ExampleNote } from "./JournalView.tsx";
+import { exampleProps, isExample, sampleMessages } from "../samples.ts";
 import { CompletedToggle, type DoneToggle } from "./OrganizedView.tsx";
 
 type Props = {
@@ -67,10 +68,12 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
   const { spec } = template;
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const all = messages
-    .flatMap(toEntries)
-    .filter((e) => spec.include.length === 0 || spec.include.includes(e.category as never))
-    .sort((a, b) => (spec.sort === "newest" ? -1 : 1) * (a.message.created_at - b.message.created_at));
+  const fits = (e: Entry) => spec.include.length === 0 || spec.include.includes(e.category as never);
+  const own = messages.flatMap(toEntries).filter(fits);
+  // With nothing of the person's own to show, the page is filled with the faded examples that fit it instead of being left blank.
+  const examples = own.length ? [] : sampleMessages().flatMap(toEntries).filter(fits);
+  const sample = examples.length > 0;
+  const all = (sample ? examples : own).sort((a, b) => (spec.sort === "newest" ? -1 : 1) * (a.message.created_at - b.message.created_at));
   // A template that leaves out completed to-dos lists them at the end instead, under "Completed", the way Organized does.
   const done = spec.hideDone ? all.filter((e) => e.done) : [];
   const entries = spec.hideDone ? all.filter((e) => !e.done) : all;
@@ -84,6 +87,7 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
 
   return (
     <div className={`tpl font-${spec.style.font} accent-${spec.style.accent} density-${spec.style.density}`}>
+      {sample && <ExampleNote until="something in your Log fits this template" jumps={messages.length === 0} />}
       <header className="tpl-head">
         <span className="page-icon tpl-icon" aria-hidden="true">
           {spec.emoji}
@@ -109,39 +113,34 @@ export function TemplateView({ template, messages, onJumpToMessage, onEdit, onDe
         {spec.note && <p className="tpl-note">{spec.note}</p>}
       </header>
 
-      {all.length === 0 ? (
-        messages.length === 0 ? (
-          <EmptyDoc />
-        ) : (
-          <p className="tpl-empty">Nothing matches this template yet. Edit the prompt to include more, or add entries in the Log.</p>
-        )
-      ) : (
-        <>
-          {entries.length > 0 &&
-            groups.map((g) => (
-              <section className="tpl-group" key={g.key}>
-                {g.label && (
-                  <h2>
-                    {g.label}
-                    <span className="tpl-count">{g.entries.length}</span>
-                  </h2>
-                )}
-                <Layout spec={spec} list={g.entries} showCategory={showCategory} onJump={onJumpToMessage} />
-              </section>
-            ))}
-          {done.length > 0 && (
-            <section className="tpl-group">
-              {entries.length === 0 && <p className="todo-clear">All done 🎉</p>}
-              <CompletedToggle count={done.length} showDone={showDone} onToggleDone={onToggleDone} />
-              {showDone && (
-                <div className="done-list">
-                  <Layout spec={spec} list={done} showCategory={showCategory} onJump={onJumpToMessage} />
-                </div>
+      {/* No example fits either, such as a page of moments only. */}
+      {all.length === 0 && <p className="page-note">Nothing matches this template yet. Edit the prompt to include more, or add entries in the Log.</p>}
+      {/* A template keeps its examples until something fits it, which can be after the Log has lost its own. */}
+      <div {...exampleProps(sample, messages.length === 0)}>
+        {entries.length > 0 &&
+          groups.map((g) => (
+            <section className="tpl-group" key={g.key}>
+              {g.label && (
+                <h2>
+                  {g.label}
+                  <span className="tpl-count">{g.entries.length}</span>
+                </h2>
               )}
+              <Layout spec={spec} list={g.entries} showCategory={showCategory} onJump={onJumpToMessage} />
             </section>
-          )}
-        </>
-      )}
+          ))}
+        {done.length > 0 && (
+          <section className="tpl-group">
+            {entries.length === 0 && <p className="todo-clear">All done 🎉</p>}
+            <CompletedToggle count={done.length} showDone={showDone} onToggleDone={onToggleDone} />
+            {showDone && (
+              <div className="done-list">
+                <Layout spec={spec} list={done} showCategory={showCategory} onJump={onJumpToMessage} />
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
@@ -252,6 +251,7 @@ function Check({ e }: { e: Entry }) {
       type="checkbox"
       className="tpl-checkbox"
       checked={e.done}
+      disabled={isExample(e.id)}
       aria-label={e.done ? "Mark as not done" : "Mark as done"}
       onChange={() => api.patchItem(e.id, { done: !e.done })}
     />

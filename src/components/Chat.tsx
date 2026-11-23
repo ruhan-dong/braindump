@@ -5,16 +5,18 @@ import { dayKey, formatDay, formatTime, groupBy } from "../format.ts";
 import { AttachmentView, ImageLink, LinkCard, Linkified } from "./Media.tsx";
 import { Composer } from "./Composer.tsx";
 import { PhotoAccessDialog, usePhotoLibrary } from "./PhotoAccess.tsx";
-import { COVERS } from "../covers.ts";
+import { exampleProps, isExample, sampleMessages } from "../samples.ts";
 
 type Props = {
   messages: Message[];
+  /** False until the log has been fetched, so an account with messages never sees the examples flash by. */
+  loaded: boolean;
   onJumpToItem: (itemId: string) => void;
   /** The sign-out control, shown at the right of the header. */
   account?: ReactNode;
 };
 
-export function Chat({ messages, onJumpToItem, account }: Props) {
+export function Chat({ messages, loaded, onJumpToItem, account }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const [dragging, setDragging] = useState(false);
@@ -22,13 +24,15 @@ export function Chat({ messages, onJumpToItem, account }: Props) {
   const library = usePhotoLibrary();
   const [photosOpen, setPhotosOpen] = useState(false);
   const openPhotos = () => setPhotosOpen(true);
+  // With an empty log, it is filled with faded example messages (src/samples.ts) instead of being left blank.
+  const sample = loaded && messages.length === 0;
 
   // Keep the view pinned to the newest message unless the user scrolled up to read history.
   const pinToBottom = () => {
     const el = listRef.current;
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
   };
-  useLayoutEffect(pinToBottom, [messages]);
+  useLayoutEffect(pinToBottom, [messages, loaded]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -72,31 +76,28 @@ export function Chat({ messages, onJumpToItem, account }: Props) {
         onLoadCapture={pinToBottom}
         onLoadedMetadataCapture={pinToBottom}
       >
-        {messages.length === 0 && (
-          <div className="empty">
-            <img src={COVERS.toast} alt="" />
-            <h2>Empty your head here</h2>
-            <p>To-dos, ideas, links, screenshots, inspiration, voice memos. Send them as they come and your Notebook auto-organizes them for you.</p>
-          </div>
-        )}
-        {groupBy(messages, (m) => dayKey(m.created_at)).map(([day, msgs]) => {
-          const d = formatDay(msgs[0].created_at);
-          return (
-            <div key={day}>
-              <div className="day-sep">
-                <span>
-                  {d.rel}
-                  {d.weekday}, {d.date}
-                </span>
+        <div {...exampleProps(sample)}>
+          {groupBy(sample ? sampleMessages() : messages, (m) => dayKey(m.created_at)).map(([day, msgs]) => {
+            const d = formatDay(msgs[0].created_at);
+            return (
+              <div key={day}>
+                <div className="day-sep">
+                  <span>
+                    {d.rel}
+                    {d.weekday}, {d.date}
+                  </span>
+                </div>
+                {msgs.map((m) => (
+                  <Bubble key={m.id} m={m} onJumpToItem={onJumpToItem} onOpenPhotos={openPhotos} />
+                ))}
               </div>
-              {msgs.map((m) => (
-                <Bubble key={m.id} m={m} onJumpToItem={onJumpToItem} onOpenPhotos={openPhotos} />
-              ))}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
+      {/* Outside the list, so it stays put above the box to type in however far the examples are scrolled. */}
+      {sample && <p className="example-note">These are example messages. Click the label under one to see where it ends up in the Notebook. They go away once you send your first one.</p>}
       <Composer
         dropped={dropped}
         onDroppedConsumed={() => setDropped([])}
@@ -300,6 +301,8 @@ type ChipProps = { m: Message; category: (typeof CATEGORIES)[number]; items: Ite
 /** A category tag that opens a menu: move its items to another category, show them in Notebook, or act on the message. */
 function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
   const { open, setOpen, ref } = useMenu();
+  // An example message can only be shown in the Notebook: there is nothing saved to move, sort again or delete.
+  const example = isExample(m.id);
 
   function move(to: string) {
     setOpen(false);
@@ -308,7 +311,7 @@ function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
 
   return (
     <span className="tag-menu" ref={ref}>
-      <button className={`tag cat-${category.id}`} onClick={() => setOpen((o) => !o)} title="Change category" aria-expanded={open}>
+      <button className={`tag cat-${category.id}`} onClick={() => setOpen((o) => !o)} title={example ? undefined : "Change category"} aria-expanded={open}>
         {category.emoji} {category.label}
         {items.length > 1 ? ` ×${items.length}` : ""}
         <svg className="tag-caret" width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
@@ -317,13 +320,14 @@ function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
       </button>
       {open && (
         <span className="msg-menu-pop" ref={revealMenu}>
-          {CATEGORIES.map((c) => (
-            <button key={c.id} className={c.id === category.id ? "on" : ""} onClick={() => move(c.id)}>
-              {c.emoji} {c.label}
-            </button>
-          ))}
-          {!api.demo && <SortAgainButton m={m} close={() => setOpen(false)} />}
-          <hr />
+          {!example &&
+            CATEGORIES.map((c) => (
+              <button key={c.id} className={c.id === category.id ? "on" : ""} onClick={() => move(c.id)}>
+                {c.emoji} {c.label}
+              </button>
+            ))}
+          {!example && !api.demo && <SortAgainButton m={m} close={() => setOpen(false)} />}
+          {!example && <hr />}
           <button
             onClick={() => {
               setOpen(false);
@@ -332,7 +336,7 @@ function CategoryChip({ m, category, items, onJumpToItem }: ChipProps) {
           >
             Show in Notebook
           </button>
-          {!api.demo && (
+          {!example && !api.demo && (
             <>
               <hr />
               <DeleteMessageButton m={m} close={() => setOpen(false)} />
